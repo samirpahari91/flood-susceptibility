@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flood Susceptibility Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; }
+    #controls {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: white; padding: 15px; border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3); min-width: 180px;
+    }
+    .legend-item { display: flex; align-items: center; margin: 5px 0; font-size: 13px; }
+    .legend-color { width: 20px; height: 20px; margin-right: 8px; border-radius: 3px; }
+    #opacity-slider { width: 100%; margin-top: 5px; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="controls">
+  <b>🌊 Flood Susceptibility</b>
+  <hr/>
+  <div class="legend-item"><div class="legend-color" style="background:#d7191c"></div> Very High</div>
+  <div class="legend-item"><div class="legend-color" style="background:#fdae61"></div> High</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ffffbf"></div> Moderate</div>
+  <div class="legend-item"><div class="legend-color" style="background:#a6d96a"></div> Low</div>
+  <div class="legend-item"><div class="legend-color" style="background:#1a9641"></div> Very Low</div>
+  <hr/>
+  <label>Opacity: <span id="opacity-val">80%</span></label>
+  <input id="opacity-slider" type="range" min="0" max="100" value="80"/>
+</div>
+<script>
+  const TITILER = "https://smr05729-flood-tile-server.hf.space";
+  const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
+
+  const map = L.map('map').setView([20, 80], 5);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  const floodLayer = L.tileLayer(
+    `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r`,
+    { opacity: 0.8, attribution: 'Flood Susceptibility' }
+  ).addTo(map);
+
+  document.getElementById('opacity-slider').addEventListener('input', function() {
+    floodLayer.setOpacity(this.value / 100);
+    document.getElementById('opacity-val').textContent = this.value + '%';
+  });
+
+  // Auto zoom to your data extent
+  fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
+    .then(r => r.json())
+    .then(info => {
+      const b = info.bounds;
+      map.fitBounds([[b[1], b[0]], [b[3], b[2]]]);
+    });
+</script>
+</body>
+</html>
+```
+
+4. Click **"Commit new file"**
+
+---
+
+## Step 3 — Enable GitHub Pages
+
+1. Go to your repo **Settings**
+2. Click **"Pages"** on the left sidebar
+3. Under **"Source"** select **"Deploy from a branch"**
+4. Select **"main"** branch → **"/ (root)"**
+5. Click **"Save"**
+
+---
+
+After a minute your webapp will be live at:
+```
+https://YOUR-GITHUB-USERNAME.github.io/flood-susceptibility-webapp
