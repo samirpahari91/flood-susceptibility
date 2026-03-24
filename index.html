@@ -85,6 +85,20 @@
     }
     .search-box button:hover { background: #357abd; }
     .search-box button:disabled { background: #b2bec3; cursor: not-allowed; }
+
+    /* Click hint */
+    .click-hint {
+      background: #e8f4fd;
+      border: 1px solid #bee3f8;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      color: #2b6cb0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
     .result-card {
       border-radius: 10px;
       padding: 14px;
@@ -93,7 +107,7 @@
       display: none;
     }
     .result-card.visible { display: block; }
-    .result-location { font-size: 13px; color: #636e72; margin-bottom: 10px; }
+    .result-location { font-size: 12px; color: #636e72; margin-bottom: 10px; }
     .risk-badge {
       display: flex;
       align-items: center;
@@ -110,6 +124,22 @@
     .prob-bar-wrap { background: #e9ecef; border-radius: 20px; height: 8px; overflow: hidden; margin-top: 4px; }
     .prob-bar { height: 100%; border-radius: 20px; transition: width 0.6s ease; }
     .prob-label { display: flex; justify-content: space-between; font-size: 11px; color: #b2bec3; margin-top: 4px; }
+
+    /* Advisory box */
+    .advisory-box {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      border-left: 4px solid;
+    }
+    .advisory-very-low  { background: #f0fff4; border-color: #1a9641; color: #1b5e20; }
+    .advisory-low       { background: #f1f8e9; border-color: #a6d96a; color: #33691e; }
+    .advisory-moderate  { background: #fffde7; border-color: #f4d03f; color: #7d6608; }
+    .advisory-high      { background: #fff3e0; border-color: #fdae61; color: #7d3c00; }
+    .advisory-very-high { background: #ffebee; border-color: #d7191c; color: #7b241c; }
+
     .risk-very-low  { background: #e8f5e9; color: #1b5e20; border: 1.5px solid #a5d6a7; }
     .risk-low       { background: #f1f8e9; color: #33691e; border: 1.5px solid #c5e1a5; }
     .risk-moderate  { background: #fffde7; color: #f57f17; border: 1.5px solid #fff176; }
@@ -125,6 +155,7 @@
     .bar-moderate  { background: #f4d03f; }
     .bar-high      { background: #fdae61; }
     .bar-very-high { background: #d7191c; }
+
     .outside-card {
       background: #fff8e1;
       border: 1.5px solid #ffe082;
@@ -163,7 +194,7 @@
       margin-top: 8px;
     }
     .error-msg.visible { display: block; }
-    #map { flex: 1; }
+    #map { flex: 1; cursor: crosshair; }
     .spinner {
       display: none;
       width: 14px; height: 14px;
@@ -174,8 +205,6 @@
     }
     .spinner.visible { display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Tile loading indicator */
     #tile-loading {
       position: fixed;
       bottom: 20px;
@@ -190,6 +219,40 @@
       display: none;
       pointer-events: none;
     }
+
+    /* Leaflet popup custom style */
+    .leaflet-popup-content {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      min-width: 200px;
+    }
+    .popup-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #2d3436;
+    }
+    .popup-risk {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .popup-prob {
+      font-size: 12px;
+      color: #636e72;
+      margin-bottom: 8px;
+    }
+    .popup-advisory {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border-left: 3px solid;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -198,18 +261,18 @@
   <div class="logo">🌊</div>
   <div>
     <h1>Flood Susceptibility Map — North Fork Kentucky River Watershed</h1>
-    <p>CNN + XGBoost Model &nbsp;|&nbsp; Hosted on Hugging Face &nbsp;|&nbsp; EPSG:3089 auto-reprojected to Web Mercator</p>
+    <p>CNN + XGBoost Model &nbsp;|&nbsp; Click anywhere on map or search a location to check flood risk</p>
   </div>
 </header>
 
 <div class="main">
   <div class="sidebar">
 
-    <!-- Location Search -->
+    <!-- Search -->
     <div>
-      <div class="section-title">📍 Check Location Risk</div>
+      <div class="section-title">📍 Search Location</div>
       <div class="search-box">
-        <input type="text" id="location-input" placeholder="e.g. Hazard, KY or 123 Main St, Whitesburg..."/>
+        <input type="text" id="location-input" placeholder="e.g. Hazard, KY or Whitesburg, KY..."/>
         <button id="search-btn" onclick="searchLocation()">
           <span id="btn-text">Check Flood Risk</span>
           <span class="spinner" id="spinner"></span>
@@ -218,7 +281,12 @@
       <div class="error-msg" id="error-msg"></div>
     </div>
 
-    <!-- Result -->
+    <!-- Click hint -->
+    <div class="click-hint">
+      🖱️ You can also <strong>&nbsp;click directly on the map&nbsp;</strong> to check flood risk at any point.
+    </div>
+
+    <!-- Result card -->
     <div class="result-card" id="result-card">
       <div class="result-location" id="result-location">📍 —</div>
       <div class="risk-badge" id="risk-badge">
@@ -232,12 +300,13 @@
         <div class="prob-bar" id="prob-bar" style="width:0%"></div>
       </div>
       <div class="prob-label"><span>0%</span><span>50%</span><span>100%</span></div>
+      <div class="advisory-box" id="advisory-box"></div>
     </div>
 
     <!-- Outside area -->
     <div class="outside-card" id="outside-card">
       ⚠️ <strong>Outside Study Area</strong><br>
-      This location is outside the North Fork Kentucky River Watershed coverage. Please search for a location within Eastern Kentucky.
+      This location is outside the North Fork Kentucky River Watershed. Please search for a location within Eastern Kentucky.
     </div>
 
     <!-- Legend -->
@@ -301,7 +370,6 @@
   <div id="map"></div>
 </div>
 
-<!-- Tile loading toast -->
 <div id="tile-loading">⏳ Loading flood layer tiles...</div>
 
 <script>
@@ -313,38 +381,49 @@
     + `&colormap_name=rdylgn_r`
     + `&rescale=0,1`;
 
-  // ── Map — default view: Hazard, KY ─────────────────────────────
-  // Hazard, KY coordinates: 37.2473° N, 83.1932° W
-  const map = L.map('map').setView([37.2473, -83.1932], 12);
-
-  // OpenStreetMap basemap
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19
-  }).addTo(map);
-
-  // Flood susceptibility layer with loading indicator
-  const tileLoading = document.getElementById('tile-loading');
-  const floodLayer  = L.tileLayer(TILE_URL, {
-    opacity: 0.8,
-    attribution: 'Flood Susceptibility | CNN+XGBoost | smr05729'
-  });
-  floodLayer.on('loading', () => tileLoading.style.display = 'block');
-  floodLayer.on('load',    () => tileLoading.style.display = 'none');
-  floodLayer.addTo(map);
-
-  // Opacity control
-  document.getElementById('opacity-slider').addEventListener('input', function () {
-    floodLayer.setOpacity(this.value / 100);
-    document.getElementById('opacity-val').textContent = this.value + '%';
-  });
-
-  // Enter key search
-  document.getElementById('location-input').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') searchLocation();
-  });
-
-  let marker = null;
+  // ── Advisory messages per risk class ───────────────────────────
+  const ADVISORIES = {
+    'Very Low': {
+      icon: '✅',
+      advcls: 'advisory-very-low',
+      popupColor: '#e8f5e9',
+      popupBorder: '#1a9641',
+      popupText: '#1b5e20',
+      msg: 'This area has very low flood susceptibility. No immediate flood concern, but always stay weather-aware during heavy rainfall events.'
+    },
+    'Low': {
+      icon: '🟡',
+      advcls: 'advisory-low',
+      popupColor: '#f1f8e9',
+      popupBorder: '#a6d96a',
+      popupText: '#33691e',
+      msg: 'This area has low flood susceptibility. During prolonged heavy rain, monitor local weather alerts and be prepared to act if conditions worsen.'
+    },
+    'Moderate': {
+      icon: '⚠️',
+      advcls: 'advisory-moderate',
+      popupColor: '#fffde7',
+      popupBorder: '#f4d03f',
+      popupText: '#7d6608',
+      msg: 'This area has moderate flood susceptibility. Watch for heavy rainfall forecasts, monitor the nearest river gauge height, and have an emergency plan ready.'
+    },
+    'High': {
+      icon: '🚨',
+      advcls: 'advisory-high',
+      popupColor: '#fff3e0',
+      popupBorder: '#fdae61',
+      popupText: '#7d3c00',
+      msg: 'This area has HIGH flood risk. Watch out for news of heavy flooding. Constantly monitor river gauge heights and be ready to evacuate. Avoid low-lying areas during rain events.'
+    },
+    'Very High': {
+      icon: '🆘',
+      advcls: 'advisory-very-high',
+      popupColor: '#ffebee',
+      popupBorder: '#d7191c',
+      popupText: '#7b241c',
+      msg: 'VERY HIGH flood risk! This area is extremely susceptible to flooding. Continuously monitor river gauge heights and emergency alerts. Follow evacuation orders immediately and avoid this area during any rainfall event.'
+    }
+  };
 
   // ── Risk classification (fixed bins 0–1) ───────────────────────
   function classifyRisk(prob) {
@@ -355,14 +434,132 @@
     return                  { label: 'Very High', cls: 'risk-very-high', dot: 'dot-very-high', bar: 'bar-very-high' };
   }
 
-  // ── Check if value is nodata ────────────────────────────────────
-  // Your COG nodata = -1.0 exactly. We use a small threshold to
-  // catch any floating point variation around -1.
+  // ── nodata check — COG nodata = -1.0 ───────────────────────────
   function isNodata(val) {
     return val === null || val === undefined || val < -0.5;
   }
 
-  // ── Location search ────────────────────────────────────────────
+  // ── Query TiTiler point — tries both endpoint formats ──────────
+  async function queryFloodValue(lonF, latF) {
+    // titiler.xyz uses /cog/point/{lon},{lat}?url=...
+    const url = `${TITILER}/cog/point/${lonF},${latF}?url=${encodeURIComponent(COG_URL)}`;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`TiTiler error: ${res.status}`);
+    const data = await res.json();
+
+    // Handle both response shapes
+    if (Array.isArray(data.values) && data.values.length > 0) return data.values[0];
+    if (typeof data.value !== 'undefined') return data.value;
+    // Some versions return { "band 1": value }
+    const keys = Object.keys(data);
+    if (keys.length > 0) return data[keys[0]];
+    return null;
+  }
+
+  // ── Build popup HTML ────────────────────────────────────────────
+  function buildPopupHTML(title, prob, risk) {
+    const adv = ADVISORIES[risk.label];
+    return `
+      <div class="popup-title">📍 ${title}</div>
+      <span class="popup-risk" style="background:${adv.popupColor};color:${adv.popupText};border:1px solid ${adv.popupBorder}">
+        ${adv.icon} ${risk.label} Flood Risk
+      </span>
+      <div class="popup-prob">Probability: <strong>${(prob * 100).toFixed(1)}%</strong></div>
+      <div class="popup-advisory" style="background:${adv.popupColor};border-color:${adv.popupBorder};color:${adv.popupText}">
+        ${adv.msg}
+      </div>
+    `;
+  }
+
+  // ── Update sidebar result card ──────────────────────────────────
+  function updateSidebar(shortName, prob, risk) {
+    const adv = ADVISORIES[risk.label];
+    document.getElementById('risk-badge').className    = `risk-badge ${risk.cls}`;
+    document.getElementById('risk-dot').className      = `risk-dot ${risk.dot}`;
+    document.getElementById('risk-label').textContent  = `${risk.label} Flood Risk`;
+    document.getElementById('result-location').innerHTML = `📍 ${shortName}`;
+    document.getElementById('prob-value').textContent  = `${(prob * 100).toFixed(1)}%`;
+    const bar = document.getElementById('prob-bar');
+    bar.className   = `prob-bar ${risk.bar}`;
+    bar.style.width = `${prob * 100}%`;
+    const advBox = document.getElementById('advisory-box');
+    advBox.className   = `advisory-box ${adv.advcls}`;
+    advBox.innerHTML   = `${adv.icon} ${adv.msg}`;
+    document.getElementById('result-card').classList.add('visible');
+    document.getElementById('outside-card').classList.remove('visible');
+  }
+
+  // ── Map setup ───────────────────────────────────────────────────
+  // Default view: Hazard, KY
+  const map = L.map('map').setView([37.2473, -83.1932], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const tileLoading = document.getElementById('tile-loading');
+  const floodLayer  = L.tileLayer(TILE_URL, {
+    opacity: 0.8,
+    attribution: 'Flood Susceptibility | CNN+XGBoost | smr05729'
+  });
+  floodLayer.on('loading', () => tileLoading.style.display = 'block');
+  floodLayer.on('load',    () => tileLoading.style.display = 'none');
+  floodLayer.addTo(map);
+
+  // Opacity slider
+  document.getElementById('opacity-slider').addEventListener('input', function () {
+    floodLayer.setOpacity(this.value / 100);
+    document.getElementById('opacity-val').textContent = this.value + '%';
+  });
+
+  // Enter key search
+  document.getElementById('location-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchLocation();
+  });
+
+  let marker = null;
+
+  // ── MAP CLICK — query flood risk at clicked point ───────────────
+  map.on('click', async function (e) {
+    const latF = e.latlng.lat;
+    const lonF = e.latlng.lng;
+
+    // Temporary loading popup
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([latF, lonF]).addTo(map);
+    marker.bindPopup('<i>Querying flood risk...</i>').openPopup();
+
+    try {
+      const rawVal = await queryFloodValue(lonF, latF);
+
+      if (isNodata(rawVal)) {
+        marker.setPopupContent(`
+          <div class="popup-title">📍 Clicked Location</div>
+          <div style="color:#795548;font-size:12px;">
+            ⚠️ <strong>Outside Study Area</strong><br>
+            This point is outside the North Fork Kentucky River Watershed coverage.
+          </div>
+        `);
+        document.getElementById('outside-card').classList.add('visible');
+        document.getElementById('result-card').classList.remove('visible');
+        return;
+      }
+
+      const prob = Math.min(Math.max(rawVal, 0), 1);
+      const risk = classifyRisk(prob);
+      const coordLabel = `${latF.toFixed(4)}°N, ${Math.abs(lonF).toFixed(4)}°W`;
+
+      marker.setPopupContent(buildPopupHTML(coordLabel, prob, risk));
+      marker.openPopup();
+      updateSidebar(coordLabel, prob, risk);
+
+    } catch (err) {
+      marker.setPopupContent('<div style="color:red;font-size:12px;">⚠️ Could not retrieve flood data. Please try again.</div>');
+    }
+  });
+
+  // ── Search by address ───────────────────────────────────────────
   async function searchLocation() {
     const query = document.getElementById('location-input').value.trim();
     if (!query) return;
@@ -382,71 +579,44 @@
     outsideCard.classList.remove('visible');
 
     try {
-      // Step 1 — Geocode via Nominatim (returns WGS84 lon/lat)
+      // Geocode via Nominatim
       const geoRes  = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
         { headers: { 'Accept-Language': 'en' } }
       );
       const geoData = await geoRes.json();
-
       if (!geoData.length) throw new Error('Location not found. Try a more specific address or city name.');
 
       const { lat, lon, display_name } = geoData[0];
       const latF = parseFloat(lat);
       const lonF = parseFloat(lon);
 
-      // Step 2 — Query pixel value from TiTiler
-      // TiTiler accepts WGS84 lon/lat and internally converts to
-      // EPSG:3089 to look up the correct pixel in your COG.
-      const ptRes  = await fetch(
-        `${TITILER}/cog/point/${lonF}/${latF}?url=${encodeURIComponent(COG_URL)}`
-      );
+      // Query flood value
+      const rawVal = await queryFloodValue(lonF, latF);
 
-      if (!ptRes.ok) throw new Error('Could not query flood data for this location.');
-
-      const ptData = await ptRes.json();
-
-      // TiTiler returns { values: [float] } — handle both old and new response shapes
-      let rawVal = null;
-      if (Array.isArray(ptData.values) && ptData.values.length > 0) {
-        rawVal = ptData.values[0];
-      } else if (typeof ptData.value !== 'undefined') {
-        rawVal = ptData.value;
-      }
-
-      // Pan map + place marker
+      // Pan + marker
       map.setView([latF, lonF], 13);
       if (marker) map.removeLayer(marker);
       marker = L.marker([latF, lonF]).addTo(map);
 
-      // nodata check — COG nodata is -1.0
       if (isNodata(rawVal)) {
-        marker.bindPopup(`<b>${display_name.split(',')[0]}</b><br>⚠️ Outside study area`).openPopup();
+        marker.bindPopup(`
+          <div class="popup-title">📍 ${display_name.split(',')[0]}</div>
+          <div style="color:#795548;font-size:12px;">
+            ⚠️ <strong>Outside Study Area</strong><br>
+            This location is outside the watershed coverage.
+          </div>
+        `).openPopup();
         outsideCard.classList.add('visible');
         return;
       }
 
-      // Valid pixel — clamp to [0, 1]
       const prob      = Math.min(Math.max(rawVal, 0), 1);
       const risk      = classifyRisk(prob);
       const shortName = display_name.split(',').slice(0, 2).join(',');
 
-      // Update result card
-      document.getElementById('risk-badge').className    = `risk-badge ${risk.cls}`;
-      document.getElementById('risk-dot').className      = `risk-dot ${risk.dot}`;
-      document.getElementById('risk-label').textContent  = `${risk.label} Flood Risk`;
-      document.getElementById('result-location').innerHTML = `📍 ${shortName}`;
-      document.getElementById('prob-value').textContent  = `${(prob * 100).toFixed(1)}%`;
-      const bar = document.getElementById('prob-bar');
-      bar.className   = `prob-bar ${risk.bar}`;
-      bar.style.width = `${prob * 100}%`;
-      resultCard.classList.add('visible');
-
-      marker.bindPopup(`
-        <b>${display_name.split(',')[0]}</b><br>
-        Flood Risk: <b>${risk.label}</b><br>
-        Probability: <b>${(prob * 100).toFixed(1)}%</b>
-      `).openPopup();
+      marker.bindPopup(buildPopupHTML(display_name.split(',')[0], prob, risk)).openPopup();
+      updateSidebar(shortName, prob, risk);
 
     } catch (err) {
       errorMsg.textContent = err.message || 'Something went wrong. Please try again.';
