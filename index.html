@@ -1802,7 +1802,12 @@
     async function ensureAnalysisRaster() {
       if (!analysisRasterPromise) {
         setStatus("analysis-status", "Loading raster for client-side AOI analysis…");
-        analysisRasterPromise = geoblaze.parse(COG_URL);
+        analysisRasterPromise = (async () => {
+          const resp = await fetch(COG_URL);
+          if (!resp.ok) throw new Error(`Raster download failed: ${resp.status} ${resp.statusText}`);
+          const arr = await resp.arrayBuffer();
+          return await parseGeoraster(arr);
+        })();
       }
       return analysisRasterPromise;
     }
@@ -1820,35 +1825,76 @@
       return Number.isFinite(v) && v >= 0 && v <= 1;
     }
 
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function getGridValue(grid, row, col) {
+      if (grid == null) return undefined;
+      if (Array.isArray(grid)) {
+        const rowVal = grid[row];
+        if (Array.isArray(rowVal) || ArrayBuffer.isView(rowVal)) return rowVal[col];
+        return rowVal;
+      }
+      if (ArrayBuffer.isView(grid)) return grid[row];
+      return undefined;
+    }
+
     async function getAOIPixelValues(aoiGeoJSON) {
       const featureCollection = normalizeAOIForStats(aoiGeoJSON);
       const feature = featureCollection?.features?.[0] || null;
       const geometry = feature?.geometry || null;
       const raster = await ensureAnalysisRaster();
 
-      if (!geometry || geometry.type !== "Polygon" || !Array.isArray(geometry.coordinates)) {
-        throw new Error("Only Polygon AOIs are supported for raster area analysis.");
+      if (!geometry || !["Polygon", "MultiPolygon"].includes(geometry.type)) {
+        throw new Error("Only Polygon or MultiPolygon AOIs are supported for raster area analysis.");
+      }
+      if (typeof raster.getValues !== "function") {
+        throw new Error("Raster reader does not support windowed value extraction.");
       }
 
-      const candidates = [
-        geometry.coordinates,
-        geometry,
-        JSON.stringify(geometry.coordinates),
-        JSON.stringify(geometry)
-      ].filter(Boolean);
+      const bbox = turf.bbox(feature);
+      const pixelWidth = Math.abs(Number(raster.pixelWidth || raster.resolution?.x || 0));
+      const pixelHeight = Math.abs(Number(raster.pixelHeight || raster.resolution?.y || 0));
+      if (!(pixelWidth > 0) || !(pixelHeight > 0)) {
+        throw new Error("Raster pixel dimensions could not be determined.");
+      }
 
-      let lastErr = null;
-      for (const candidate of candidates) {
-        try {
-          const result = await geoblaze.get(raster, candidate, true);
-          const flat = flattenDeep(result).map(Number).filter(isUsableRasterValue);
-          if (flat.length) return flat;
-        } catch (err) {
-          lastErr = err;
+      const left = clamp(bbox[0], raster.xmin, raster.xmax);
+      const right = clamp(bbox[2], raster.xmin, raster.xmax);
+      const bottom = clamp(bbox[1], raster.ymin, raster.ymax);
+      const top = clamp(bbox[3], raster.ymin, raster.ymax);
+      if (!(right > left) || !(top > bottom)) {
+        throw new Error("Selected area does not overlap the raster extent.");
+      }
+
+      const width = Math.max(1, Math.ceil((right - left) / pixelWidth));
+      const height = Math.max(1, Math.ceil((top - bottom) / pixelHeight));
+      const valuesWindow = await raster.getValues({ left, right, top, bottom, width, height });
+      const bandGrid = Array.isArray(valuesWindow) ? valuesWindow[0] : valuesWindow;
+      if (!bandGrid) {
+        throw new Error("Raster window could not be read for the selected area.");
+      }
+
+      const featureForMask = turf.feature(geometry);
+      const xStep = (right - left) / width;
+      const yStep = (top - bottom) / height;
+      const nodata = raster.noDataValue;
+      const out = [];
+
+      for (let row = 0; row < height; row++) {
+        const y = top - ((row + 0.5) * yStep);
+        for (let col = 0; col < width; col++) {
+          const x = left + ((col + 0.5) * xStep);
+          if (!turf.booleanPointInPolygon(turf.point([x, y]), featureForMask)) continue;
+          const raw = getGridValue(bandGrid, row, col);
+          const value = Number(raw);
+          if (!Number.isFinite(value)) continue;
+          if (nodata != null && value === Number(nodata)) continue;
+          if (isUsableRasterValue(value)) out.push(value);
         }
       }
-      if (lastErr) throw lastErr;
-      return [];
+      return out;
     }
 
     function countValuesByProbabilityBins(values, edges) {
