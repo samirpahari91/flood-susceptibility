@@ -6,544 +6,669 @@
   <title>Flood Susceptibility — North Fork Kentucky River Watershed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Averia+Sans+Libre&family=Source+Sans+3:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    /* ── Reset & Base ─────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    /* ── Design tokens (Calcite-inspired) ────────── */
     :root {
-      --navy:        #0b1f3a;
-      --navy-mid:    #122844;
-      --navy-light:  #1a3a5c;
-      --teal:        #0ea5c9;
-      --teal-dim:    #0891b2;
-      --surface:     #ffffff;
-      --surface-2:   #f4f7fb;
-      --surface-3:   #e9eef6;
-      --border:      #dce4f0;
-      --text-1:      #0b1f3a;
-      --text-2:      #4a5f7a;
-      --text-3:      #8899ae;
-      --shadow-sm:   0 1px 4px rgba(11,31,58,.08);
-      --shadow-md:   0 4px 20px rgba(11,31,58,.12);
-      --shadow-lg:   0 8px 40px rgba(11,31,58,.18);
-      --radius-sm:   8px;
-      --radius-md:   12px;
-      --radius-lg:   16px;
-      --risk-vl-bg:  #e8f5e9; --risk-vl-fg: #1b5e20; --risk-vl-bd: #a5d6a7; --risk-vl-dot: #1a9641;
-      --risk-lo-bg:  #f1f8e9; --risk-lo-fg: #33691e; --risk-lo-bd: #c5e1a5; --risk-lo-dot: #78b240;
-      --risk-mo-bg:  #fffde7; --risk-mo-fg: #856404; --risk-mo-bd: #ffe082; --risk-mo-dot: #f4d03f;
-      --risk-hi-bg:  #fff3e0; --risk-hi-fg: #7d3c00; --risk-hi-bd: #ffcc80; --risk-hi-dot: #fdae61;
-      --risk-vh-bg:  #ffebee; --risk-vh-fg: #7b241c; --risk-vh-bd: #ef9a9a; --risk-vh-dot: #d7191c;
+      --brand:         #0079c1;
+      --brand-dark:    #005a8c;
+      --brand-light:   #e8f4fb;
+      --brand-hover:   #00598c;
+      --header-bg:     #1a2731;
+      --header-border: #2c3e4d;
+      --panel-bg:      #f8f8f8;
+      --panel-border:  #d4d4d4;
+      --surface:       #ffffff;
+      --surface-hover: #f0f0f0;
+      --divider:       #e8e8e8;
+      --text-1:        #1a1a1a;
+      --text-2:        #404040;
+      --text-3:        #6e6e6e;
+      --text-4:        #9e9e9e;
+      --focus:         rgba(0,121,193,.25);
+      --shadow-sm:     0 1px 2px rgba(0,0,0,.16);
+      --shadow-md:     0 2px 8px rgba(0,0,0,.16);
+      --shadow-lg:     0 4px 16px rgba(0,0,0,.2);
+      --radius-xs:     2px;
+      --radius-sm:     4px;
+      --radius-md:     6px;
+      --panel-w:       330px;
+
+      /* Risk colors */
+      --vl-c:#1a9641; --vl-bg:#e9f5ec; --vl-bd:#a5d6a7; --vl-fg:#1b5e20;
+      --lo-c:#6ab04c; --lo-bg:#f1f8e9; --lo-bd:#b9dba2; --lo-fg:#33691e;
+      --mo-c:#e6b800; --mo-bg:#fefce8; --mo-bd:#fde68a; --mo-fg:#78520a;
+      --hi-c:#e07c00; --hi-bg:#fff4e8; --hi-bd:#fcd8a8; --hi-fg:#7c3200;
+      --vh-c:#d7191c; --vh-bg:#feecec; --vh-bd:#f5a5a5; --vh-fg:#7b1c1c;
     }
 
-    html, body { height: 100%; overflow: hidden; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: 'Source Sans 3', 'Avenir Next', Arial, sans-serif; }
 
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background: var(--navy);
-      color: var(--text-1);
+    /* ── Header ─────────────────────────────────── */
+    #header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 50px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--header-border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 0;
+      z-index: 1000;
+      user-select: none;
     }
+    .hdr-product {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px 0 4px;
+      border-right: 1px solid var(--header-border);
+      height: 100%;
+    }
+    .hdr-icon {
+      width: 30px; height: 30px;
+      background: var(--brand);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .hdr-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: .01em;
+    }
+    .hdr-divider { width: 1px; height: 24px; background: var(--header-border); margin: 0 14px; }
+    .hdr-title {
+      font-size: 14px;
+      color: #c8d4dc;
+      font-weight: 400;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-spacer { flex: 1; }
+    .hdr-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--brand);
+      background: rgba(0,121,193,.15);
+      border: 1px solid rgba(0,121,193,.35);
+      padding: 3px 9px;
+      border-radius: var(--radius-sm);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .hdr-btn {
+      width: 32px; height: 32px;
+      border: none;
+      background: transparent;
+      color: #c8d4dc;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      transition: background .15s;
+      margin-left: 4px;
+    }
+    .hdr-btn:hover { background: rgba(255,255,255,.1); color: white; }
 
-    /* ── Full-screen map ──────────────────────────── */
+    /* ── Full-screen map ─────────────────────────── */
     #map {
       position: fixed;
-      inset: 0;
+      top: 50px; left: 0; right: 0; bottom: 0;
       z-index: 0;
       cursor: crosshair;
     }
 
-    /* ── Top header bar ───────────────────────────── */
-    #topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 56px;
-      background: var(--navy);
-      display: flex;
-      align-items: center;
-      padding: 0 18px;
-      gap: 14px;
-      z-index: 800;
-      box-shadow: 0 2px 12px rgba(0,0,0,.35);
-    }
-    #topbar .logo {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--teal), #0369a1);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-      box-shadow: 0 0 12px rgba(14,165,201,.4);
-    }
-    #topbar .title-wrap h1 {
-      font-size: 14px;
-      font-weight: 700;
-      color: #ffffff;
-      letter-spacing: .01em;
-      line-height: 1.2;
-    }
-    #topbar .title-wrap p {
-      font-size: 11px;
-      color: #7a9bbf;
-      font-weight: 400;
-    }
-    #topbar .spacer { flex: 1; }
-    #topbar .tag {
-      background: rgba(14,165,201,.15);
-      border: 1px solid rgba(14,165,201,.3);
-      color: var(--teal);
-      font-size: 11px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
-      letter-spacing: .03em;
-    }
-
-    /* ── Floating left panel ──────────────────────── */
+    /* ── Left panel ──────────────────────────────── */
     #panel {
       position: fixed;
-      top: 68px;
-      left: 14px;
-      bottom: 14px;
-      width: 320px;
-      background: var(--surface);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
+      top: 50px;
+      left: 0;
+      bottom: 0;
+      width: var(--panel-w);
+      background: var(--panel-bg);
+      border-right: 1px solid var(--panel-border);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      z-index: 700;
-      border: 1px solid var(--border);
-      transition: transform .3s ease, opacity .3s ease;
+      z-index: 500;
+      transition: transform .25s ease;
+      box-shadow: var(--shadow-md);
     }
-    #panel.hidden {
-      transform: translateX(-340px);
-      opacity: 0;
-      pointer-events: none;
-    }
+    #panel.collapsed { transform: translateX(calc(-1 * var(--panel-w))); }
 
-    /* Panel toggle button */
-    #panel-toggle {
+    /* Panel toggle tab on edge */
+    #panel-tab {
       position: fixed;
-      top: 68px;
-      left: 14px;
-      z-index: 701;
-      background: var(--navy);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      width: 36px; height: 36px;
+      top: 50%;
+      left: var(--panel-w);
+      transform: translateY(-50%);
+      width: 16px;
+      height: 56px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-left: none;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
       cursor: pointer;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
-      box-shadow: var(--shadow-md);
-      transition: background .2s;
+      z-index: 501;
+      transition: left .25s ease;
+      box-shadow: 2px 0 4px rgba(0,0,0,.1);
     }
-    #panel-toggle:hover { background: var(--navy-light); }
+    #panel-tab:hover { background: var(--surface-hover); }
+    #panel-tab svg { width: 10px; height: 10px; fill: var(--text-3); }
+    #panel.collapsed + #panel-tab { left: 0; }
+    #panel.collapsed + #panel-tab .arrow { transform: rotate(180deg); }
 
+    /* Panel header */
+    .panel-hdr {
+      padding: 0 12px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--divider);
+      flex-shrink: 0;
+    }
+    .panel-hdr-icon { font-size: 14px; }
+    .panel-hdr-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+
+    /* Panel sections */
     .panel-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      overflow-x: hidden;
     }
-    .panel-scroll::-webkit-scrollbar { width: 4px; }
+    .panel-scroll::-webkit-scrollbar { width: 6px; }
     .panel-scroll::-webkit-scrollbar-track { background: transparent; }
-    .panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .panel-scroll::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+    .panel-scroll::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
 
-    /* Panel section header */
-    .sec-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-3);
-      margin-bottom: 6px;
+    .section {
+      border-bottom: 1px solid var(--divider);
     }
-
-    /* ── Search ───────────────────────────────────── */
-    .search-wrap { position: relative; }
-    .search-input-row {
+    .section-hdr {
+      padding: 0 12px;
+      height: 38px;
       display: flex;
-      gap: 6px;
       align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      background: var(--surface);
+      transition: background .15s;
+    }
+    .section-hdr:hover { background: var(--surface-hover); }
+    .section-hdr-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .section-hdr-arrow {
+      font-size: 11px;
+      color: var(--text-4);
+      transition: transform .2s;
+    }
+    .section-hdr.open .section-hdr-arrow { transform: rotate(180deg); }
+    .section-body {
+      padding: 10px 12px;
+      background: var(--panel-bg);
+    }
+    .section-body.hidden { display: none; }
+
+    /* ── Search ──────────────────────────────────── */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      overflow: visible;
+      position: relative;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .search-bar:focus-within {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px var(--focus);
+    }
+    .search-bar-icon {
+      padding: 0 10px;
+      color: var(--text-4);
+      font-size: 14px;
+      flex-shrink: 0;
     }
     #search-input {
       flex: 1;
-      padding: 10px 12px 10px 36px;
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius-sm);
+      border: none;
+      outline: none;
       font-family: inherit;
       font-size: 13px;
       color: var(--text-1);
-      background: var(--surface-2);
-      outline: none;
-      transition: border-color .2s, background .2s;
+      padding: 8px 0;
+      background: transparent;
     }
-    #search-input:focus {
-      border-color: var(--teal);
-      background: var(--surface);
+    #search-input::placeholder { color: var(--text-4); }
+    #search-clear {
+      padding: 0 8px;
+      color: var(--text-4);
+      font-size: 16px;
+      cursor: pointer;
+      display: none;
+      line-height: 1;
+      border: none;
+      background: transparent;
     }
-    .search-icon {
-      position: absolute;
-      left: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-3);
-      font-size: 14px;
-      pointer-events: none;
-    }
+    #search-clear:hover { color: var(--text-2); }
     #search-btn {
-      padding: 10px 14px;
-      background: var(--navy);
+      height: 100%;
+      padding: 0 12px;
+      background: var(--brand);
       color: white;
       border: none;
-      border-radius: var(--radius-sm);
       font-family: inherit;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: background .2s;
+      display: flex; align-items: center; gap: 5px;
+      transition: background .15s;
+      border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+      flex-shrink: 0;
     }
-    #search-btn:hover { background: var(--navy-light); }
-    #search-btn:disabled { background: var(--text-3); cursor: not-allowed; }
+    #search-btn:hover { background: var(--brand-hover); }
+    #search-btn:disabled { background: var(--text-4); cursor: not-allowed; }
 
-    /* Autocomplete dropdown */
+    /* Autocomplete */
     #autocomplete {
       position: absolute;
-      top: calc(100% + 4px);
-      left: 0; right: 0;
+      top: calc(100% + 2px);
+      left: -1px; right: -1px;
       background: var(--surface);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--panel-border);
       border-radius: var(--radius-sm);
-      box-shadow: var(--shadow-md);
-      z-index: 900;
+      box-shadow: var(--shadow-lg);
+      z-index: 999;
       overflow: hidden;
       display: none;
     }
     .ac-item {
-      padding: 10px 12px;
-      font-size: 12px;
+      padding: 8px 12px;
+      font-size: 13px;
       cursor: pointer;
       color: var(--text-1);
-      border-bottom: 1px solid var(--surface-3);
-      transition: background .15s;
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
+      border-bottom: 1px solid var(--divider);
+      transition: background .12s;
+      display: flex; align-items: flex-start; gap: 8px;
     }
     .ac-item:last-child { border-bottom: none; }
-    .ac-item:hover { background: var(--surface-2); }
-    .ac-item .ac-icon { color: var(--teal); font-size: 12px; margin-top: 1px; flex-shrink: 0; }
-    .ac-item .ac-name { font-weight: 600; }
-    .ac-item .ac-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+    .ac-item:hover { background: var(--brand-light); }
+    .ac-icon { color: var(--brand); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
+    .ac-name { font-weight: 600; font-size: 13px; }
+    .ac-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
 
-    .error-msg {
-      background: #ffebee;
-      color: #c62828;
+    .error-chip {
+      display: none;
+      margin-top: 6px;
+      background: #feecec;
+      border: 1px solid var(--vh-bd);
+      border-radius: var(--radius-sm);
+      padding: 7px 10px;
+      font-size: 12px;
+      color: var(--vh-fg);
+    }
+    .error-chip.on { display: block; }
+
+    /* ── Result card ─────────────────────────────── */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      display: none;
+      animation: fadeSlide .25s ease;
+    }
+    .result-card.on { display: block; }
+    @keyframes fadeSlide {
+      from { opacity:0; transform:translateY(-4px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .rc-top {
+      padding: 10px 12px;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .rc-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .rc-loc {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-1);
+      line-height: 1.3;
+    }
+    .rc-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+    .rc-band {
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .rc-score-row {
+      padding: 2px 12px 4px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .rc-score-lbl { font-size: 11px; color: var(--text-3); }
+    .rc-score-val {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+    .rc-track {
+      margin: 0 12px 4px;
+      height: 4px;
+      background: #e8e8e8;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .rc-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+    .rc-ends {
+      display: flex; justify-content: space-between;
+      margin: 0 12px 10px;
+      font-size: 10px;
+      color: var(--text-4);
+    }
+    .rc-advisory {
+      margin: 0 12px 12px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      line-height: 1.6;
+      border-left: 3px solid;
+    }
+
+    /* Outside card */
+    .outside-card {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
       border-radius: var(--radius-sm);
       padding: 9px 11px;
       font-size: 12px;
-      border: 1px solid #ef9a9a;
+      color: #78350f;
+      line-height: 1.5;
       display: none;
-      margin-top: 6px;
     }
-    .error-msg.visible { display: block; }
+    .outside-card.on { display: block; }
 
-    /* ── Stats strip ──────────────────────────────── */
-    .stats-strip {
+    /* ── Stats row ───────────────────────────────── */
+    .stats-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 6px;
     }
-    .stat-card {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
+    .stat-tile {
+      background: var(--surface);
+      border: 1px solid var(--panel-border);
       border-radius: var(--radius-sm);
-      padding: 10px 12px;
+      padding: 8px 10px;
     }
     .stat-val {
-      font-family: 'DM Mono', monospace;
-      font-size: 18px;
+      font-family: 'Source Code Pro', monospace;
+      font-size: 16px;
       font-weight: 500;
-      color: var(--navy);
+      color: var(--brand-dark);
       line-height: 1;
     }
     .stat-lbl {
       font-size: 10px;
       color: var(--text-3);
-      margin-top: 4px;
-      font-weight: 500;
+      margin-top: 3px;
       text-transform: uppercase;
-      letter-spacing: .04em;
+      letter-spacing: .05em;
     }
 
-    /* ── Result card ──────────────────────────────── */
-    .result-card {
-      border-radius: var(--radius-md);
-      padding: 14px;
-      border: 1.5px solid var(--border);
-      background: var(--surface);
-      display: none;
-      animation: slideIn .3s ease;
-    }
-    .result-card.visible { display: block; }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .result-loc {
-      font-size: 12px;
-      color: var(--text-2);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .result-loc strong {
-      color: var(--text-1);
-      font-size: 13px;
-    }
-    .risk-pill {
+    /* ── Legend ──────────────────────────────────── */
+    .legend-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 11px 16px;
+      padding: 6px 8px;
       border-radius: var(--radius-sm);
-      font-size: 15px;
-      font-weight: 800;
-      width: 100%;
-      justify-content: center;
-      margin-bottom: 12px;
-      letter-spacing: .01em;
+      cursor: default;
+      transition: background .12s;
     }
-    .risk-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-    /* Score bar */
-    .score-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-    .score-lbl { font-size: 11px; color: var(--text-3); font-weight: 500; }
-    .score-val {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-1);
-    }
-    .bar-track {
-      height: 6px;
-      background: var(--surface-3);
-      border-radius: 20px;
-      overflow: hidden;
-      margin-bottom: 3px;
-    }
-    .bar-fill {
-      height: 100%;
-      border-radius: 20px;
-      transition: width .7s cubic-bezier(.4,0,.2,1);
-    }
-    .bar-ends {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      color: var(--text-3);
-      margin-bottom: 10px;
-    }
-
-    /* Advisory */
-    .advisory {
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      line-height: 1.65;
-      border-left: 3px solid;
-      margin-top: 2px;
-    }
-
-    /* Outside area */
-    .outside-card {
-      background: #fffbeb;
-      border: 1.5px solid #fcd34d;
-      border-radius: var(--radius-sm);
-      padding: 11px 13px;
-      font-size: 12px;
-      color: #78350f;
-      display: none;
-      line-height: 1.5;
-    }
-    .outside-card.visible { display: block; }
-
-    /* Click hint */
-    .click-hint {
-      background: linear-gradient(135deg, #eff6ff, #e0f2fe);
-      border: 1px solid #bae6fd;
-      border-radius: var(--radius-sm);
-      padding: 9px 12px;
-      font-size: 12px;
-      color: #0c4a6e;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 500;
-    }
-
-    /* ── Legend ───────────────────────────────────── */
-    .legend-grid { display: flex; flex-direction: column; gap: 2px; }
-    .legend-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 7px 10px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background .15s;
-      border: 1.5px solid transparent;
-    }
-    .legend-row:hover { background: var(--surface-2); }
-    .legend-row.active { border-color: var(--border); background: var(--surface-2); }
-    .legend-swatch {
-      width: 24px; height: 12px;
-      border-radius: 3px;
+    .legend-item:hover { background: var(--brand-light); }
+    .legend-patch {
+      width: 18px; height: 18px;
+      border-radius: var(--radius-xs);
       flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,.12);
     }
-    .legend-row-label { font-size: 13px; font-weight: 500; color: var(--text-1); }
-    .legend-row-range {
+    .legend-lbl { font-size: 13px; color: var(--text-2); font-weight: 400; }
+    .legend-range {
       margin-left: auto;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--text-3);
+      font-family: 'Source Code Pro', monospace;
+      font-size: 10px;
+      color: var(--text-4);
     }
 
-    /* ── Basemap selector ─────────────────────────── */
-    .basemap-grid {
+    /* ── Basemap gallery ─────────────────────────── */
+    .bm-gallery {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 6px;
     }
-    .bm-btn {
-      border: 2px solid var(--border);
+    .bm-tile {
+      border: 2px solid var(--panel-border);
       border-radius: var(--radius-sm);
       overflow: hidden;
       cursor: pointer;
       background: none;
       padding: 0;
-      transition: border-color .2s, transform .15s;
+      text-align: left;
+      transition: border-color .15s, box-shadow .15s;
     }
-    .bm-btn:hover { transform: scale(1.03); }
-    .bm-btn.active { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,165,201,.2); }
+    .bm-tile:hover { border-color: var(--brand); }
+    .bm-tile.active {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(0,121,193,.3);
+    }
     .bm-thumb {
       width: 100%;
-      aspect-ratio: 3/2;
+      padding-top: 65%;
+      position: relative;
+      overflow: hidden;
+    }
+    .bm-thumb-inner {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 22px;
     }
-    .bm-label {
+    .bm-label-strip {
+      padding: 4px 6px;
       font-size: 10px;
       font-weight: 600;
-      padding: 4px 6px;
-      background: var(--surface-2);
       color: var(--text-2);
+      background: var(--surface);
+      border-top: 1px solid var(--divider);
       text-align: center;
-      letter-spacing: .02em;
+      text-transform: uppercase;
+      letter-spacing: .04em;
     }
+    .bm-tile.active .bm-label-strip { color: var(--brand); background: var(--brand-light); }
 
-    /* Basemap thumb colors */
-    .bm-osm      { background: #e8f0e4; }
-    .bm-satellite{ background: #1a2a1a; color: #7bbd7b; }
-    .bm-topo     { background: #d4c8a8; }
-    .bm-dark     { background: #1a1a2e; color: #6b8cba; }
-    .bm-light    { background: #f5f5f0; color: #999; }
-    .bm-terrain  { background: #c8d8b0; }
+    /* Basemap preview backgrounds */
+    .bmt-streets  { background: #f0ebe3; }
+    .bmt-satellite{ background: #1c2b1c; }
+    .bmt-topo     { background: #cfd8b0; }
+    .bmt-dark     { background: #1a2333; }
+    .bmt-light    { background: #f5f4f1; }
+    .bmt-terrain  { background: #b8c89a; }
 
-    /* ── Opacity slider ───────────────────────────── */
-    .opacity-row {
+    /* ── Layer control ───────────────────────────── */
+    .layer-row {
       display: flex;
       align-items: center;
       gap: 10px;
+      padding: 6px 8px;
+      background: var(--surface);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
     }
-    .opacity-row input[type=range] {
+    .layer-vis-btn {
+      width: 22px; height: 22px;
+      border: 1px solid var(--panel-border);
+      background: var(--surface);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      transition: background .12s;
+    }
+    .layer-vis-btn:hover { background: var(--surface-hover); }
+    .layer-vis-btn.off { opacity: .4; }
+    .layer-name { font-size: 13px; color: var(--text-1); flex: 1; font-weight: 500; }
+    .layer-opacity-wrap {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 6px;
+    }
+    .layer-opacity-lbl { font-size: 11px; color: var(--text-3); }
+    .layer-opacity-val {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 11px;
+      color: var(--text-3);
+      min-width: 28px;
+    }
+    input[type=range] {
       flex: 1;
-      accent-color: var(--teal);
-      height: 4px;
+      accent-color: var(--brand);
       cursor: pointer;
     }
-    .opacity-val {
-      font-family: 'DM Mono', monospace;
+
+    /* ── Click hint ──────────────────────────────── */
+    .click-hint {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px;
+      background: var(--brand-light);
+      border: 1px solid rgba(0,121,193,.25);
+      border-radius: var(--radius-sm);
       font-size: 12px;
-      color: var(--text-2);
-      min-width: 32px;
-      text-align: right;
+      color: var(--brand-dark);
     }
 
-    /* ── Floating right controls ──────────────────── */
-    #map-controls {
+    /* ── Right toolbar (map tools) ───────────────── */
+    #toolbar {
       position: fixed;
-      top: 68px;
-      right: 14px;
+      top: 60px;
+      right: 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      z-index: 700;
-    }
-    .map-btn {
-      width: 38px; height: 38px;
+      z-index: 400;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1px solid var(--panel-border);
       border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .tool-btn {
+      width: 32px; height: 32px;
+      border: none;
+      background: var(--surface);
+      color: var(--text-2);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      transition: background .12s, color .12s;
+      border-bottom: 1px solid var(--divider);
+      position: relative;
+    }
+    .tool-btn:last-child { border-bottom: none; }
+    .tool-btn:hover { background: var(--brand-light); color: var(--brand); }
+    .tool-btn.active { background: var(--brand); color: white; }
+    .tool-btn[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      right: calc(100% + 6px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--header-bg);
+      color: white;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: var(--radius-xs);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* ── Scale bar / attribution bar ─────────────── */
+    #bottom-bar {
+      position: fixed;
+      bottom: 0; left: var(--panel-w); right: 0;
+      height: 22px;
+      background: rgba(255,255,255,.9);
+      border-top: 1px solid var(--panel-border);
       display: flex;
       align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 16px;
-      box-shadow: var(--shadow-sm);
-      transition: background .2s, box-shadow .2s;
-      color: var(--text-2);
+      padding: 0 10px;
+      gap: 12px;
+      z-index: 300;
+      font-size: 10px;
+      color: var(--text-3);
+      transition: left .25s ease;
     }
-    .map-btn:hover { background: var(--surface-2); box-shadow: var(--shadow-md); }
-    .map-btn.active { background: var(--navy); color: white; border-color: var(--navy); }
+    #bottom-bar.expanded { left: 0; }
+    #coords-display {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 10px;
+      color: var(--text-3);
+      min-width: 200px;
+    }
+    .bb-sep { color: var(--divider); }
+    .bb-link { color: var(--text-4); text-decoration: none; }
+    .bb-link:hover { color: var(--brand); }
 
-    /* ── Tile loading toast ───────────────────────── */
+    /* ── Tile loading ────────────────────────────── */
     #tile-toast {
       position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(60px);
-      background: var(--navy);
+      bottom: 30px;
+      right: 50px;
+      background: var(--header-bg);
       color: white;
-      padding: 10px 20px;
-      border-radius: 24px;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       z-index: 900;
       pointer-events: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex; align-items: center; gap: 8px;
       box-shadow: var(--shadow-lg);
-      transition: transform .3s ease, opacity .3s ease;
       opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
     }
-    #tile-toast.visible {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-    }
-    .toast-spinner {
-      width: 12px; height: 12px;
+    #tile-toast.on { opacity: 1; transform: translateY(0); }
+    .t-spin {
+      width: 11px; height: 11px;
       border: 2px solid rgba(255,255,255,.3);
       border-top-color: white;
       border-radius: 50%;
@@ -551,347 +676,377 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Map click loading ring ───────────────────── */
-    .click-ring {
-      width: 28px; height: 28px;
-      border: 3px solid rgba(14,165,201,.6);
-      border-top-color: var(--teal);
+    /* ── Custom marker ───────────────────────────── */
+    .marker-loading {
+      width: 26px; height: 26px;
+      border: 3px solid rgba(0,121,193,.5);
+      border-top-color: var(--brand);
       border-radius: 50%;
       animation: spin .7s linear infinite;
     }
 
-    /* ── Spinner in button ────────────────────────── */
-    .btn-spinner {
+    /* ── Leaflet popup overrides ─────────────────── */
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--radius-sm) !important;
+      box-shadow: var(--shadow-lg) !important;
+      padding: 0 !important;
+      overflow: hidden;
+      border: 1px solid var(--panel-border) !important;
+      min-width: 230px;
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      font-family: 'Source Sans 3', sans-serif !important;
+    }
+    .leaflet-popup-tip { display: none; }
+    .leaflet-popup-close-button {
+      color: white !important;
+      font-size: 18px !important;
+      top: 6px !important;
+      right: 8px !important;
+      font-weight: 300 !important;
+    }
+    .pop-hdr {
+      padding: 10px 30px 10px 12px;
+      color: white;
+    }
+    .pop-hdr-title { font-size: 13px; font-weight: 700; }
+    .pop-hdr-sub   { font-size: 11px; opacity: .75; margin-top: 1px; font-family: 'Source Code Pro', monospace; }
+    .pop-body { padding: 10px 12px 12px; background: var(--surface); }
+    .pop-band {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px;
+      border-radius: var(--radius-xs);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      border: 1px solid;
+    }
+    .pop-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .pop-score-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .pop-score-lbl { font-size: 11px; color: var(--text-3); }
+    .pop-score-val { font-family: 'Source Code Pro', monospace; font-size: 11px; color: var(--text-2); }
+    .pop-track { height: 4px; background: #e8e8e8; border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+    .pop-fill  { height: 100%; border-radius: 2px; }
+    .pop-advisory {
+      font-size: 11.5px;
+      line-height: 1.55;
+      padding: 8px 10px;
+      border-radius: var(--radius-xs);
+      border-left: 3px solid;
+    }
+    .pop-outside {
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #78350f;
+      line-height: 1.5;
+      background: var(--surface);
+    }
+
+    /* ── Button spinner ──────────────────────────── */
+    .btn-spin {
       display: none;
-      width: 13px; height: 13px;
-      border: 2px solid rgba(255,255,255,.35);
+      width: 12px; height: 12px;
+      border: 2px solid rgba(255,255,255,.4);
       border-top-color: white;
       border-radius: 50%;
       animation: spin .7s linear infinite;
     }
-    .btn-spinner.on { display: inline-block; }
+    .btn-spin.on { display: inline-block; }
 
-    /* ── Leaflet popup overrides ──────────────────── */
-    .leaflet-popup-content-wrapper {
-      border-radius: var(--radius-md) !important;
-      box-shadow: var(--shadow-lg) !important;
-      padding: 0 !important;
-      overflow: hidden;
-      border: 1px solid var(--border) !important;
-    }
-    .leaflet-popup-content {
-      margin: 0 !important;
-      font-family: 'Plus Jakarta Sans', sans-serif !important;
-      width: 240px !important;
-    }
-    .leaflet-popup-tip-container { display: none; }
-    .leaflet-popup-close-button {
-      top: 8px !important;
-      right: 8px !important;
-      color: white !important;
-      font-size: 18px !important;
-      z-index: 10;
-    }
-    .pop-header {
-      padding: 12px 14px 10px;
-      color: white;
-    }
-    .pop-header h3 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-    .pop-header p  { font-size: 11px; opacity: .8; font-family: 'DM Mono', monospace; }
-    .pop-body { padding: 12px 14px; background: var(--surface); }
-    .pop-score-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    .pop-score-lbl { font-size: 11px; color: var(--text-3); font-weight: 500; }
-    .pop-score-val {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-1);
-    }
-    .pop-bar-track { height: 5px; background: var(--surface-3); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
-    .pop-bar-fill  { height: 100%; border-radius: 10px; }
-    .pop-advisory {
-      font-size: 11.5px;
-      line-height: 1.6;
-      padding: 9px 11px;
-      border-radius: 6px;
-      border-left: 3px solid;
-    }
-    .pop-outside {
-      padding: 12px 14px;
-      background: var(--surface);
-      font-size: 12px;
-      color: #78350f;
-      line-height: 1.5;
-    }
-
-    /* ── Mobile ───────────────────────────────────── */
-    @media (max-width: 700px) {
-      #topbar .tag { display: none; }
-      #topbar .title-wrap p { display: none; }
-
+    /* ── Mobile ──────────────────────────────────── */
+    @media (max-width: 680px) {
+      :root { --panel-w: 100vw; }
       #panel {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        height: 55vh;
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        transform: translateY(calc(100% - 56px));
-        transition: transform .35s cubic-bezier(.4,0,.2,1);
+        top: auto; bottom: 0;
+        height: 50vh;
+        transform: translateY(calc(100% - 42px));
+        border-right: none;
+        border-top: 1px solid var(--panel-border);
+        border-radius: 8px 8px 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,.15);
       }
-      #panel.expanded { transform: translateY(0); }
-      #panel.hidden   { transform: translateY(100%); opacity: 1; pointer-events: all; }
-
-      .drawer-handle {
+      #panel.collapsed { transform: translateY(0); }
+      #panel-tab { display: none; }
+      #bottom-bar { left: 0; }
+      #toolbar { top: auto; bottom: calc(50vh + 8px); right: 8px; }
+      .hdr-title, .hdr-tag { display: none; }
+      .mobile-handle {
         display: flex;
         justify-content: center;
-        padding: 10px;
-        cursor: pointer;
+        padding: 8px 0 4px;
         flex-shrink: 0;
+        cursor: pointer;
       }
-      .drawer-handle-bar {
-        width: 36px; height: 4px;
-        background: var(--border);
+      .mobile-handle-bar {
+        width: 32px; height: 3px;
+        background: var(--panel-border);
         border-radius: 2px;
       }
-
-      #panel-toggle { display: none !important; }
-      #map-controls { top: auto; bottom: 70px; }
     }
-
-    @media (min-width: 701px) {
-      .drawer-handle { display: none; }
+    @media (min-width: 681px) {
+      .mobile-handle { display: none; }
     }
-
-    /* ── Data credits ─────────────────────────────── */
-    #credits {
-      position: fixed;
-      bottom: 8px;
-      right: 14px;
-      font-size: 10px;
-      color: rgba(255,255,255,.5);
-      z-index: 600;
-      text-align: right;
-      line-height: 1.6;
-    }
-    #credits a { color: rgba(255,255,255,.6); text-decoration: none; }
-    #credits a:hover { color: white; }
   </style>
 </head>
 <body>
 
-<!-- ── Top bar ── -->
-<div id="topbar">
-  <div class="logo">🌊</div>
-  <div class="title-wrap">
-    <h1>Flood Susceptibility Map</h1>
-    <p>North Fork Kentucky River Watershed — CNN + XGBoost Model</p>
+<!-- ── Header ── -->
+<div id="header">
+  <div class="hdr-product">
+    <div class="hdr-icon">🌊</div>
+    <span class="hdr-name">FloodMap KY</span>
   </div>
-  <div class="spacer"></div>
-  <div class="tag">RESEARCH</div>
+  <div class="hdr-divider"></div>
+  <span class="hdr-title">North Fork Kentucky River Watershed — Flood Susceptibility</span>
+  <div class="hdr-spacer"></div>
+  <span class="hdr-tag">Research</span>
+  <button class="hdr-btn" title="Share" onclick="copyLink()">🔗</button>
+  <button class="hdr-btn" id="hdr-panel-btn" title="Toggle panel" onclick="togglePanel()">☰</button>
 </div>
 
-<!-- ── Full-screen map ── -->
+<!-- ── Map ── -->
 <div id="map"></div>
 
-<!-- ── Floating panel ── -->
+<!-- ── Panel ── -->
 <div id="panel">
-  <!-- Mobile handle -->
-  <div class="drawer-handle" id="drawer-handle">
-    <div class="drawer-handle-bar"></div>
+  <div class="mobile-handle" onclick="toggleMobilePanel()">
+    <div class="mobile-handle-bar"></div>
+  </div>
+
+  <!-- Panel header -->
+  <div class="panel-hdr">
+    <span class="panel-hdr-icon">🗂️</span>
+    <span class="panel-hdr-title">Contents</span>
   </div>
 
   <div class="panel-scroll">
 
     <!-- Search -->
-    <div>
-      <div class="sec-label">Search Location</div>
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <div class="search-input-row">
-          <input type="text" id="search-input" placeholder="e.g. Hazard, KY or Whitesburg..."/>
-          <button id="search-btn" onclick="doSearch()">
-            <span id="btn-text">Go</span>
-            <span class="btn-spinner" id="btn-spinner"></span>
-          </button>
+    <div class="section">
+      <div class="section-hdr open" onclick="toggleSection(this)">
+        <span class="section-hdr-label">Find Location</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body">
+        <div style="position:relative">
+          <div class="search-bar">
+            <span class="search-bar-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Search address or place…" autocomplete="off"/>
+            <button id="search-clear" onclick="clearSearch()">✕</button>
+            <button id="search-btn" onclick="doSearch()">
+              <span id="btn-text">Search</span>
+              <span class="btn-spin" id="btn-spin"></span>
+            </button>
+          </div>
+          <div id="autocomplete"></div>
         </div>
-        <div id="autocomplete"></div>
-        <div class="error-msg" id="error-msg"></div>
+        <div class="error-chip" id="error-chip"></div>
+        <div style="height:8px"></div>
+        <div class="click-hint">
+          <span>ℹ️</span> Click anywhere on the map to query flood susceptibility.
+        </div>
+        <div style="height:8px"></div>
+        <!-- Result -->
+        <div class="result-card" id="result-card">
+          <div class="rc-top">
+            <div class="rc-dot" id="rc-dot"></div>
+            <div>
+              <div class="rc-loc" id="rc-loc">—</div>
+              <div class="rc-sub" id="rc-sub"></div>
+            </div>
+          </div>
+          <div class="rc-band" id="rc-band">
+            <span id="rc-band-icon"></span>
+            <span id="rc-band-label"></span>
+          </div>
+          <div class="rc-score-row">
+            <span class="rc-score-lbl">Susceptibility Score</span>
+            <span class="rc-score-val" id="rc-score">—</span>
+          </div>
+          <div class="rc-track">
+            <div class="rc-fill" id="rc-fill" style="width:0%"></div>
+          </div>
+          <div class="rc-ends"><span>Very Low</span><span>Very High</span></div>
+          <div class="rc-advisory" id="rc-advisory"></div>
+        </div>
+        <!-- Outside -->
+        <div class="outside-card" id="outside-card">
+          ⚠️ <strong>Outside Study Area</strong><br>
+          This location is outside the North Fork Kentucky River Watershed boundary.
+        </div>
       </div>
     </div>
 
-    <!-- Click hint -->
-    <div class="click-hint">
-      🖱️ Click anywhere on the map to check flood susceptibility instantly.
-    </div>
-
-    <!-- Stats -->
-    <div>
-      <div class="sec-label">Study Area Overview</div>
-      <div class="stats-strip">
-        <div class="stat-card">
-          <div class="stat-val">5 m</div>
-          <div class="stat-lbl">Resolution</div>
+    <!-- Layers -->
+    <div class="section">
+      <div class="section-hdr open" onclick="toggleSection(this)">
+        <span class="section-hdr-label">Layers</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body">
+        <div class="layer-row">
+          <button class="layer-vis-btn" id="flood-vis-btn" onclick="toggleFlood()" title="Toggle visibility">👁</button>
+          <span class="layer-name">Flood Susceptibility</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-val">5</div>
-          <div class="stat-lbl">Risk Classes</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val">E. KY</div>
-          <div class="stat-lbl">Region</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val">CNN+XGB</div>
-          <div class="stat-lbl">Model</div>
+        <div class="layer-opacity-wrap" style="margin-top:6px">
+          <span class="layer-opacity-lbl">Opacity</span>
+          <input type="range" id="opacity-slider" min="0" max="100" value="80"/>
+          <span class="layer-opacity-val" id="opacity-val">80%</span>
         </div>
       </div>
-    </div>
-
-    <!-- Result card -->
-    <div class="result-card" id="result-card">
-      <div class="result-loc">
-        <span>📍</span>
-        <strong id="result-loc-text">—</strong>
-      </div>
-      <div class="risk-pill" id="risk-pill">
-        <span class="risk-dot" id="risk-dot"></span>
-        <span id="risk-label">—</span>
-      </div>
-      <div class="score-row">
-        <span class="score-lbl">Susceptibility Score</span>
-        <span class="score-val" id="score-val">—</span>
-      </div>
-      <div class="bar-track">
-        <div class="bar-fill" id="bar-fill" style="width:0%"></div>
-      </div>
-      <div class="bar-ends"><span>Very Low</span><span>Very High</span></div>
-      <div class="advisory" id="advisory"></div>
-    </div>
-
-    <!-- Outside -->
-    <div class="outside-card" id="outside-card">
-      ⚠️ <strong>Outside Study Area</strong><br>
-      This location falls outside the North Fork Kentucky River Watershed boundary. Try a location within Eastern Kentucky.
     </div>
 
     <!-- Legend -->
-    <div>
-      <div class="sec-label">Susceptibility Classes</div>
-      <div class="legend-grid">
-        <div class="legend-row" data-class="very-high">
-          <div class="legend-swatch" style="background:#d7191c"></div>
-          <span class="legend-row-label">Very High</span>
-          <span class="legend-row-range">0.8–1.0</span>
+    <div class="section">
+      <div class="section-hdr open" onclick="toggleSection(this)">
+        <span class="section-hdr-label">Legend</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body" style="padding: 6px 8px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;padding-left:8px;">Flood Susceptibility Class</div>
+        <div class="legend-item">
+          <div class="legend-patch" style="background:#d7191c"></div>
+          <span class="legend-lbl">Very High</span>
+          <span class="legend-range">0.80–1.00</span>
         </div>
-        <div class="legend-row" data-class="high">
-          <div class="legend-swatch" style="background:#fdae61"></div>
-          <span class="legend-row-label">High</span>
-          <span class="legend-row-range">0.6–0.8</span>
+        <div class="legend-item">
+          <div class="legend-patch" style="background:#fdae61"></div>
+          <span class="legend-lbl">High</span>
+          <span class="legend-range">0.60–0.80</span>
         </div>
-        <div class="legend-row" data-class="moderate">
-          <div class="legend-swatch" style="background:#ffffbf"></div>
-          <span class="legend-row-label">Moderate</span>
-          <span class="legend-row-range">0.4–0.6</span>
+        <div class="legend-item">
+          <div class="legend-patch" style="background:#ffffbf"></div>
+          <span class="legend-lbl">Moderate</span>
+          <span class="legend-range">0.40–0.60</span>
         </div>
-        <div class="legend-row" data-class="low">
-          <div class="legend-swatch" style="background:#a6d96a"></div>
-          <span class="legend-row-label">Low</span>
-          <span class="legend-row-range">0.2–0.4</span>
+        <div class="legend-item">
+          <div class="legend-patch" style="background:#a6d96a"></div>
+          <span class="legend-lbl">Low</span>
+          <span class="legend-range">0.20–0.40</span>
         </div>
-        <div class="legend-row" data-class="very-low">
-          <div class="legend-swatch" style="background:#1a9641"></div>
-          <span class="legend-row-label">Very Low</span>
-          <span class="legend-row-range">0.0–0.2</span>
+        <div class="legend-item">
+          <div class="legend-patch" style="background:#1a9641"></div>
+          <span class="legend-lbl">Very Low</span>
+          <span class="legend-range">0.00–0.20</span>
         </div>
       </div>
     </div>
 
-    <!-- Basemaps -->
-    <div>
-      <div class="sec-label">Basemap</div>
-      <div class="basemap-grid">
-        <button class="bm-btn active" onclick="setBasemap('osm', this)" title="OpenStreetMap">
-          <div class="bm-thumb bm-osm">🗺️</div>
-          <div class="bm-label">Streets</div>
-        </button>
-        <button class="bm-btn" onclick="setBasemap('satellite', this)" title="Satellite">
-          <div class="bm-thumb bm-satellite">🛰️</div>
-          <div class="bm-label">Satellite</div>
-        </button>
-        <button class="bm-btn" onclick="setBasemap('topo', this)" title="Topographic">
-          <div class="bm-thumb bm-topo">⛰️</div>
-          <div class="bm-label">Topo</div>
-        </button>
-        <button class="bm-btn" onclick="setBasemap('dark', this)" title="Dark">
-          <div class="bm-thumb bm-dark">🌙</div>
-          <div class="bm-label">Dark</div>
-        </button>
-        <button class="bm-btn" onclick="setBasemap('light', this)" title="Light">
-          <div class="bm-thumb bm-light">☀️</div>
-          <div class="bm-label">Light</div>
-        </button>
-        <button class="bm-btn" onclick="setBasemap('terrain', this)" title="Terrain">
-          <div class="bm-thumb bm-terrain">🌿</div>
-          <div class="bm-label">Terrain</div>
-        </button>
+    <!-- Basemap gallery -->
+    <div class="section">
+      <div class="section-hdr open" onclick="toggleSection(this)">
+        <span class="section-hdr-label">Basemap Gallery</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body">
+        <div class="bm-gallery">
+          <button class="bm-tile active" onclick="setBasemap('streets',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-streets">🗺️</div></div>
+            <div class="bm-label-strip">Streets</div>
+          </button>
+          <button class="bm-tile" onclick="setBasemap('satellite',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-satellite">🛰️</div></div>
+            <div class="bm-label-strip">Satellite</div>
+          </button>
+          <button class="bm-tile" onclick="setBasemap('hybrid',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-satellite" style="background:#1c2b1c">🌐</div></div>
+            <div class="bm-label-strip">Hybrid</div>
+          </button>
+          <button class="bm-tile" onclick="setBasemap('topo',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-topo">⛰️</div></div>
+            <div class="bm-label-strip">Topographic</div>
+          </button>
+          <button class="bm-tile" onclick="setBasemap('dark',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-dark">🌙</div></div>
+            <div class="bm-label-strip">Dark Gray</div>
+          </button>
+          <button class="bm-tile" onclick="setBasemap('light',this)">
+            <div class="bm-thumb"><div class="bm-thumb-inner bmt-light">☀️</div></div>
+            <div class="bm-label-strip">Light Gray</div>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Flood layer opacity -->
-    <div>
-      <div class="sec-label">Flood Layer Opacity</div>
-      <div class="opacity-row">
-        <input type="range" id="opacity-slider" min="0" max="100" value="80"/>
-        <span class="opacity-val" id="opacity-val">80%</span>
+    <!-- Area overview -->
+    <div class="section">
+      <div class="section-hdr open" onclick="toggleSection(this)">
+        <span class="section-hdr-label">Study Area Overview</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body">
+        <div class="stats-row">
+          <div class="stat-tile">
+            <div class="stat-val">5 m</div>
+            <div class="stat-lbl">Resolution</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-val">5</div>
+            <div class="stat-lbl">Risk Classes</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-val">E. KY</div>
+            <div class="stat-lbl">Region</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-val" style="font-size:12px">CNN+XGB</div>
+            <div class="stat-lbl">ML Model</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Data info -->
-    <div>
-      <div class="sec-label">Data & Model</div>
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--text-2);line-height:1.8;">
-        <strong style="color:var(--text-1)">Model:</strong> CNN + XGBoost ensemble<br>
-        <strong style="color:var(--text-1)">Region:</strong> North Fork KY River Watershed<br>
-        <strong style="color:var(--text-1)">Source CRS:</strong> EPSG:3089 → EPSG:3857<br>
-        <strong style="color:var(--text-1)">Tile Server:</strong> titiler.xyz<br>
-        <strong style="color:var(--text-1)">Storage:</strong>
+    <!-- About -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">
+        <span class="section-hdr-label">About this Map</span>
+        <span class="section-hdr-arrow">▼</span>
+      </div>
+      <div class="section-body hidden" style="font-size:12px;color:var(--text-2);line-height:1.8;">
+        <strong>Model:</strong> CNN + XGBoost ensemble<br>
+        <strong>Area:</strong> North Fork Kentucky River Watershed<br>
+        <strong>Source CRS:</strong> EPSG:3089 (KY State Plane)<br>
+        <strong>Tiles:</strong> TiTiler (auto-reprojected to EPSG:3857)<br>
+        <strong>Storage:</strong>
         <a href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map"
-           target="_blank" style="color:var(--teal);text-decoration:none;">Hugging Face ↗</a>
+           target="_blank" style="color:var(--brand)">Hugging Face Dataset ↗</a><br>
+        <strong>Tile Server:</strong>
+        <a href="https://titiler.xyz" target="_blank" style="color:var(--brand)">titiler.xyz ↗</a>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- Panel toggle for desktop -->
-<button id="panel-toggle" title="Toggle panel">☰</button>
-
-<!-- Right controls -->
-<div id="map-controls">
-  <button class="map-btn" onclick="map.zoomIn()" title="Zoom in">+</button>
-  <button class="map-btn" onclick="map.zoomOut()" title="Zoom out">−</button>
-  <button class="map-btn" id="flood-toggle-btn" title="Toggle flood layer" onclick="toggleFloodLayer()">💧</button>
-  <button class="map-btn" id="locate-btn" title="Reset view" onclick="resetView()">⊕</button>
+<!-- Panel toggle tab -->
+<div id="panel-tab" onclick="togglePanel()">
+  <svg viewBox="0 0 10 10" class="arrow"><polyline points="7,2 3,5 7,8" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </div>
 
-<!-- Tile loading toast -->
+<!-- Right toolbar -->
+<div id="toolbar">
+  <button class="tool-btn" title="Zoom in"  onclick="map.zoomIn()">+</button>
+  <button class="tool-btn" title="Zoom out" onclick="map.zoomOut()">−</button>
+  <button class="tool-btn" title="Reset view" onclick="resetView()">⌂</button>
+  <button class="tool-btn" title="Full extent" onclick="fitExtent()">⊞</button>
+</div>
+
+<!-- Bottom bar -->
+<div id="bottom-bar">
+  <span id="coords-display">Lat: — &nbsp; Lon: —</span>
+  <span class="bb-sep">|</span>
+  <span>© <a class="bb-link" href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a></span>
+  <span class="bb-sep">|</span>
+  <span>Tiles: <a class="bb-link" href="https://titiler.xyz" target="_blank">TiTiler</a></span>
+  <span class="bb-sep">|</span>
+  <span>Data: <a class="bb-link" href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map" target="_blank">Hugging Face</a></span>
+</div>
+
+<!-- Tile toast -->
 <div id="tile-toast">
-  <div class="toast-spinner"></div>
-  Loading tiles...
-</div>
-
-<!-- Credits -->
-<div id="credits">
-  © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &nbsp;|&nbsp;
-  Tiles: <a href="https://titiler.xyz">TiTiler</a> &nbsp;|&nbsp;
-  Data: <a href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map">Hugging Face</a>
+  <div class="t-spin"></div>
+  Loading tiles…
 </div>
 
 <script>
@@ -903,15 +1058,15 @@ const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png`
 
 // ── Risk config ──────────────────────────────────────────────────
 const RISKS = {
-  'Very Low':  { cls:'vl', dot:'#1a9641', bar:'#1a9641', hdr:'#1a9641', bg:'#e8f5e9', fg:'#1b5e20', bd:'#a5d6a7',
+  'Very Low':  { icon:'✅', dot:'#1a9641', bar:'#1a9641', hdr:'#1a7a38', bg:'var(--vl-bg)', fg:'var(--vl-fg)', bd:'var(--vl-bd)',
     msg:'This area is highly unlikely to experience flooding based on its terrain and land characteristics. No special precautions needed under normal conditions.' },
-  'Low':       { cls:'lo', dot:'#78b240', bar:'#a6d96a', hdr:'#4a7c1f', bg:'#f1f8e9', fg:'#33691e', bd:'#c5e1a5',
+  'Low':       { icon:'🟢', dot:'#6ab04c', bar:'#a6d96a', hdr:'#4a7c1f', bg:'var(--lo-bg)', fg:'var(--lo-fg)', bd:'var(--lo-bd)',
     msg:'This area has low susceptibility to flooding. Under normal rainfall conditions, flooding is unlikely. Stay informed during periods of prolonged or heavy rainfall.' },
-  'Moderate':  { cls:'mo', dot:'#f4d03f', bar:'#f4d03f', hdr:'#b7960a', bg:'#fffde7', fg:'#7d6608', bd:'#ffe082',
-    msg:'This area has moderate susceptibility to flooding. It may be affected under sustained heavy rainfall. Keep an eye on local weather forecasts and nearby river gauge readings during storm events.' },
-  'High':      { cls:'hi', dot:'#fdae61', bar:'#fdae61', hdr:'#c45f00', bg:'#fff3e0', fg:'#7d3c00', bd:'#ffcc80',
+  'Moderate':  { icon:'⚠️', dot:'#e6b800', bar:'#f4d03f', hdr:'#b08a00', bg:'var(--mo-bg)', fg:'var(--mo-fg)', bd:'var(--mo-bd)',
+    msg:'This area has moderate susceptibility to flooding. It may be affected under sustained heavy rainfall. Monitor local weather forecasts and nearby river gauge readings during storm events.' },
+  'High':      { icon:'🚨', dot:'#e07c00', bar:'#fdae61', hdr:'#c45f00', bg:'var(--hi-bg)', fg:'var(--hi-fg)', bd:'var(--hi-bd)',
     msg:'This area is highly susceptible to flooding. During continuous heavy rainfall in your surrounding area, continuously monitor river gauge heights and local emergency alerts. Be prepared to take action if conditions escalate.' },
-  'Very High': { cls:'vh', dot:'#d7191c', bar:'#d7191c', hdr:'#a31317', bg:'#ffebee', fg:'#7b241c', bd:'#ef9a9a',
+  'Very High': { icon:'🆘', dot:'#d7191c', bar:'#d7191c', hdr:'#a31317', bg:'var(--vh-bg)', fg:'var(--vh-fg)', bd:'var(--vh-bd)',
     msg:'This area is extremely susceptible to flooding. During continuous heavy rainfall in your surrounding area, continuously monitor river gauge heights and emergency alerts. Follow all official evacuation orders immediately and avoid this area during any significant rainfall event.' }
 };
 
@@ -924,7 +1079,7 @@ function classifyRisk(p) {
 }
 function isNodata(v) { return v === null || v === undefined || v < -0.5; }
 
-// ── Map init ─────────────────────────────────────────────────────
+// ── Map ──────────────────────────────────────────────────────────
 const map = L.map('map', {
   center: [37.2473, -83.1932],
   zoom: 12,
@@ -932,346 +1087,323 @@ const map = L.map('map', {
   attributionControl: false
 });
 
-// Attribution (custom position)
-L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
-
-// ── Basemap layers ───────────────────────────────────────────────
+// ── Basemaps ─────────────────────────────────────────────────────
 const BASEMAPS = {
-  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 19
-  }),
-  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: '© Esri, Maxar, Earthstar Geographics', maxZoom: 19
-  }),
-  topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: '© Esri, HERE, Garmin, FAO, NOAA, USGS', maxZoom: 19
-  }),
-  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap, © CARTO', maxZoom: 19
-  }),
-  light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap, © CARTO', maxZoom: 19
-  }),
-  terrain: L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg', {
-    attribution: 'Map tiles by Stamen Design, © OpenStreetMap', maxZoom: 18
-  })
+  streets:   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap contributors' }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'© Esri, Maxar' }),
+  hybrid:    L.layerGroup([
+               L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 }),
+               L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 })
+             ]),
+  topo:      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'© Esri, HERE, Garmin' }),
+  dark:      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'© OpenStreetMap, © CARTO' }),
+  light:     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'© OpenStreetMap, © CARTO' })
 };
 
-let activeBasemap = BASEMAPS.osm.addTo(map);
+let activeBasemap = BASEMAPS.streets.addTo(map);
+let activeBasemapKey = 'streets';
 
 function setBasemap(key, btn) {
-  map.removeLayer(activeBasemap);
-  activeBasemap = BASEMAPS[key].addTo(map);
-  activeBasemap.bringToBack();
+  if (key === activeBasemapKey) return;
+  if (activeBasemap instanceof L.LayerGroup) map.removeLayer(activeBasemap);
+  else map.removeLayer(activeBasemap);
+  activeBasemap = BASEMAPS[key];
+  if (activeBasemap instanceof L.LayerGroup) activeBasemap.addTo(map);
+  else activeBasemap.addTo(map);
+  activeBasemapKey = key;
   floodLayer.bringToFront();
-  document.querySelectorAll('.bm-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.bm-tile').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
 
 // ── Flood layer ──────────────────────────────────────────────────
 const tileToast = document.getElementById('tile-toast');
-const floodLayer = L.tileLayer(TILE_URL, {
-  opacity: 0.8,
-  attribution: 'Flood Susceptibility | smr05729'
-});
-floodLayer.on('loading', () => tileToast.classList.add('visible'));
-floodLayer.on('load',    () => tileToast.classList.remove('visible'));
+const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8 });
+floodLayer.on('loading', () => tileToast.classList.add('on'));
+floodLayer.on('load',    () => tileToast.classList.remove('on'));
 floodLayer.addTo(map);
 
-let floodVisible = true;
-function toggleFloodLayer() {
-  const btn = document.getElementById('flood-toggle-btn');
-  if (floodVisible) {
-    map.removeLayer(floodLayer);
-    btn.classList.add('active');
-  } else {
-    floodLayer.addTo(map);
-    floodLayer.bringToFront();
-    btn.classList.remove('active');
-  }
-  floodVisible = !floodVisible;
+// Fit to COG extent on load
+fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
+  .then(r => r.json())
+  .then(info => {
+    if (info.bounds) {
+      const b = info.bounds;
+      map.fitBounds([[b[1],b[0]],[b[3],b[2]]]);
+    }
+  }).catch(() => {});
+
+let floodOn = true;
+function toggleFlood() {
+  const btn = document.getElementById('flood-vis-btn');
+  floodOn ? map.removeLayer(floodLayer) : (floodLayer.addTo(map), floodLayer.bringToFront());
+  floodOn = !floodOn;
+  btn.classList.toggle('off', !floodOn);
 }
 
-function resetView() {
-  map.setView([37.2473, -83.1932], 12);
-}
-
-// Opacity
 document.getElementById('opacity-slider').addEventListener('input', function() {
   floodLayer.setOpacity(this.value / 100);
   document.getElementById('opacity-val').textContent = this.value + '%';
 });
 
-// ── Panel toggle (desktop) ───────────────────────────────────────
-const panel = document.getElementById('panel');
-const panelToggle = document.getElementById('panel-toggle');
+// ── Coordinate display ───────────────────────────────────────────
+map.on('mousemove', e => {
+  document.getElementById('coords-display').textContent =
+    `Lat: ${e.latlng.lat.toFixed(5)}  Lon: ${e.latlng.lng.toFixed(5)}`;
+});
+
+// ── Panel toggle ─────────────────────────────────────────────────
 let panelOpen = true;
-panelToggle.addEventListener('click', () => {
+function togglePanel() {
   panelOpen = !panelOpen;
-  panel.classList.toggle('hidden', !panelOpen);
-});
-
-// Mobile drawer
-const drawerHandle = document.getElementById('drawer-handle');
-let drawerExpanded = false;
-drawerHandle.addEventListener('click', () => {
-  drawerExpanded = !drawerExpanded;
-  panel.classList.toggle('expanded', drawerExpanded);
-});
-
-// ── Custom colored markers ───────────────────────────────────────
-function makeIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
-    <filter id="s"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".3"/></filter>
-    <path filter="url(#s)" d="M14 2C7.4 2 2 7.4 2 14c0 9 12 20 12 20S26 23 26 14C26 7.4 20.6 2 14 2z"
-      fill="${color}" stroke="white" stroke-width="2"/>
-    <circle cx="14" cy="14" r="5" fill="white" opacity=".9"/>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [28, 36],
-    iconAnchor: [14, 36],
-    popupAnchor: [0, -38]
-  });
+  document.getElementById('panel').classList.toggle('collapsed', !panelOpen);
+  document.getElementById('bottom-bar').classList.toggle('expanded', !panelOpen);
 }
 
-// ── Popup HTML ───────────────────────────────────────────────────
-function buildPopup(title, subtitle, prob, riskLabel) {
-  const r = RISKS[riskLabel];
+// Mobile panel
+let mobileOpen = false;
+function toggleMobilePanel() {
+  mobileOpen = !mobileOpen;
+  document.getElementById('panel').classList.toggle('collapsed', !mobileOpen);
+}
+
+// ── Section accordion ────────────────────────────────────────────
+function toggleSection(hdr) {
+  hdr.classList.toggle('open');
+  const body = hdr.nextElementSibling;
+  body.classList.toggle('hidden');
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+function resetView() { map.setView([37.2473, -83.1932], 12); }
+function fitExtent() {
+  fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
+    .then(r => r.json()).then(info => {
+      if (info.bounds) { const b=info.bounds; map.fitBounds([[b[1],b[0]],[b[3],b[2]]]); }
+    }).catch(() => {});
+}
+function copyLink() {
+  navigator.clipboard?.writeText(location.href).then(() => alert('Link copied!')).catch(() => {});
+}
+
+// ── Marker ───────────────────────────────────────────────────────
+function makeMarker(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34">
+    <path d="M13 1C6.9 1 2 5.9 2 12c0 8.5 11 21 11 21s11-12.5 11-21C24 5.9 19.1 1 13 1z"
+      fill="${color}" stroke="white" stroke-width="1.5"/>
+    <circle cx="13" cy="12" r="4.5" fill="white" opacity=".9"/>
+  </svg>`;
+  return L.divIcon({ html: svg, className:'', iconSize:[26,34], iconAnchor:[13,34], popupAnchor:[0,-36] });
+}
+const loadingMarkerIcon = L.divIcon({
+  html: '<div class="marker-loading"></div>',
+  className:'', iconSize:[26,26], iconAnchor:[13,13]
+});
+
+let activeMarker = null;
+
+// ── Popup builders ───────────────────────────────────────────────
+function buildPopup(title, sub, prob, label) {
+  const r = RISKS[label];
   return `
-    <div class="pop-header" style="background:${r.hdr}">
-      <h3>${title}</h3>
-      <p>${subtitle}</p>
+    <div class="pop-hdr" style="background:${r.hdr}">
+      <div class="pop-hdr-title">${title}</div>
+      <div class="pop-hdr-sub">${sub}</div>
     </div>
     <div class="pop-body">
+      <div class="pop-band" style="background:${r.bg};color:${r.fg};border-color:${r.bd}">
+        <div class="pop-dot" style="background:${r.dot}"></div>${r.icon} ${label} Susceptibility
+      </div>
       <div class="pop-score-row">
         <span class="pop-score-lbl">Susceptibility Score</span>
         <span class="pop-score-val">${(prob*100).toFixed(1)}%</span>
       </div>
-      <div class="pop-bar-track">
-        <div class="pop-bar-fill" style="width:${(prob*100).toFixed(1)}%;background:${r.bar}"></div>
-      </div>
-      <div class="pop-advisory" style="background:${r.bg};border-color:${r.bar};color:${r.fg}">
-        ${r.msg}
-      </div>
+      <div class="pop-track"><div class="pop-fill" style="width:${(prob*100).toFixed(1)}%;background:${r.dot}"></div></div>
+      <div class="pop-advisory" style="background:${r.bg};border-color:${r.dot};color:${r.fg}">${r.msg}</div>
     </div>`;
 }
 
 function buildOutsidePopup(title) {
   return `
-    <div class="pop-header" style="background:#78350f">
-      <h3>${title}</h3>
-      <p>Outside study area</p>
+    <div class="pop-hdr" style="background:#78350f">
+      <div class="pop-hdr-title">${title}</div>
+      <div class="pop-hdr-sub">Outside study area</div>
     </div>
-    <div class="pop-outside">
-      ⚠️ This location is outside the North Fork Kentucky River Watershed boundary.
-    </div>`;
+    <div class="pop-outside">⚠️ This location falls outside the North Fork Kentucky River Watershed boundary.</div>`;
 }
 
-// ── Sidebar result update ────────────────────────────────────────
-function updateSidebar(locText, prob, riskLabel) {
-  const r = RISKS[riskLabel];
-  document.getElementById('risk-pill').style.cssText =
-    `background:${r.bg};color:${r.fg};border:1.5px solid ${r.bd}`;
-  document.getElementById('risk-dot').style.background  = r.dot;
-  document.getElementById('risk-label').textContent     = `${riskLabel} Susceptibility`;
-  document.getElementById('result-loc-text').textContent = locText;
-  document.getElementById('score-val').textContent      = `${(prob*100).toFixed(1)}%`;
-  const bf = document.getElementById('bar-fill');
-  bf.style.background = r.bar;
-  bf.style.width = `${prob*100}%`;
-  const adv = document.getElementById('advisory');
-  adv.style.cssText = `background:${r.bg};border-color:${r.bar};color:${r.fg}`;
+// ── Sidebar update ───────────────────────────────────────────────
+function updateSidebar(loc, sub, prob, label) {
+  const r = RISKS[label];
+  document.getElementById('rc-dot').style.background = r.dot;
+  document.getElementById('rc-loc').textContent  = loc;
+  document.getElementById('rc-sub').textContent  = sub;
+  document.getElementById('rc-band').style.cssText =
+    `background:${r.bg};color:${r.fg};border-color:${r.bd}`;
+  document.getElementById('rc-band-icon').textContent  = r.icon;
+  document.getElementById('rc-band-label').textContent = `${label} Susceptibility`;
+  document.getElementById('rc-score').textContent      = `${(prob*100).toFixed(1)}%`;
+  const fill = document.getElementById('rc-fill');
+  fill.style.background = r.dot;
+  fill.style.width = `${prob*100}%`;
+  const adv = document.getElementById('rc-advisory');
+  adv.style.cssText = `background:${r.bg};border-color:${r.dot};color:${r.fg}`;
   adv.textContent   = r.msg;
-  document.getElementById('result-card').classList.add('visible');
-  document.getElementById('outside-card').classList.remove('visible');
-  document.getElementById('error-msg').classList.remove('visible');
+  document.getElementById('result-card').classList.add('on');
+  document.getElementById('outside-card').classList.remove('on');
+  document.getElementById('error-chip').classList.remove('on');
 }
 
-// ── Query TiTiler ────────────────────────────────────────────────
+// ── Query ────────────────────────────────────────────────────────
 async function queryPoint(lon, lat) {
   const res  = await fetch(`${TITILER}/cog/point/${lon},${lat}?url=${encodeURIComponent(COG_URL)}`);
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
-  const data = await res.json();
-  if (Array.isArray(data.values) && data.values.length) return data.values[0];
-  if (data.value  != null) return data.value;
-  const k = Object.keys(data);
-  if (k.length)  return data[k[0]];
+  if (!res.ok) throw new Error(`${res.status}`);
+  const d = await res.json();
+  if (Array.isArray(d.values) && d.values.length) return d.values[0];
+  if (d.value != null) return d.value;
+  const k = Object.keys(d); if (k.length) return d[k[0]];
   return null;
 }
 
 // ── Map click ────────────────────────────────────────────────────
-let activeMarker = null;
-
-map.on('click', async (e) => {
+map.on('click', async e => {
   const { lat, lng } = e.latlng;
-
-  // Show spinning ring at click point
   if (activeMarker) map.removeLayer(activeMarker);
-  const spinIcon = L.divIcon({
-    html: '<div class="click-ring"></div>',
-    className: '', iconSize: [28,28], iconAnchor: [14,14]
-  });
-  activeMarker = L.marker([lat, lng], { icon: spinIcon }).addTo(map);
+  activeMarker = L.marker([lat, lng], { icon: loadingMarkerIcon }).addTo(map);
 
   try {
     const raw   = await queryPoint(lng, lat);
-    const coord = `${lat.toFixed(4)}°N, ${Math.abs(lng).toFixed(4)}°W`;
+    const coord = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const sub   = `${Math.abs(lat).toFixed(4)}°${lat>=0?'N':'S'}, ${Math.abs(lng).toFixed(4)}°${lng>=0?'E':'W'}`;
 
     if (isNodata(raw)) {
-      activeMarker.setIcon(makeIcon('#9e9e9e'));
-      activeMarker.bindPopup(buildOutsidePopup('Clicked Point')).openPopup();
-      document.getElementById('outside-card').classList.add('visible');
-      document.getElementById('result-card').classList.remove('visible');
+      activeMarker.setIcon(makeMarker('#9e9e9e'));
+      activeMarker.bindPopup(buildOutsidePopup('Clicked Location')).openPopup();
+      document.getElementById('outside-card').classList.add('on');
+      document.getElementById('result-card').classList.remove('on');
       return;
     }
 
     const prob  = Math.min(Math.max(raw, 0), 1);
     const label = classifyRisk(prob);
-    const r     = RISKS[label];
+    activeMarker.setIcon(makeMarker(RISKS[label].dot));
+    activeMarker.bindPopup(buildPopup('Clicked Location', sub, prob, label)).openPopup();
+    updateSidebar('Clicked Location', sub, prob, label);
 
-    activeMarker.setIcon(makeIcon(r.dot));
-    activeMarker.bindPopup(buildPopup('Clicked Location', coord, prob, label)).openPopup();
-    updateSidebar(coord, prob, label);
-
-    // Expand mobile drawer to show result
-    if (window.innerWidth <= 700 && !drawerExpanded) {
-      drawerExpanded = true;
-      panel.classList.add('expanded');
-    }
   } catch(err) {
-    activeMarker.setIcon(makeIcon('#9e9e9e'));
-    activeMarker.bindPopup('<div class="pop-outside">⚠️ Could not retrieve data. Please try again.</div>').openPopup();
+    activeMarker.setIcon(makeMarker('#9e9e9e'));
+    activeMarker.bindPopup('<div class="pop-outside">⚠️ Could not retrieve data. Try again.</div>').openPopup();
   }
 });
 
-// ── Autocomplete search ──────────────────────────────────────────
+// ── Autocomplete ─────────────────────────────────────────────────
 let acTimer = null;
 const acBox  = document.getElementById('autocomplete');
 
 document.getElementById('search-input').addEventListener('input', function() {
+  const v = this.value.trim();
+  document.getElementById('search-clear').style.display = v ? 'block' : 'none';
   clearTimeout(acTimer);
-  const q = this.value.trim();
-  if (q.length < 3) { acBox.style.display = 'none'; return; }
-  acTimer = setTimeout(() => fetchSuggestions(q), 350);
+  if (v.length < 3) { acBox.style.display='none'; return; }
+  acTimer = setTimeout(() => fetchAC(v), 350);
 });
 
-document.getElementById('search-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') { acBox.style.display = 'none'; doSearch(); }
-  if (e.key === 'Escape') acBox.style.display = 'none';
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter')  { acBox.style.display='none'; doSearch(); }
+  if (e.key === 'Escape') acBox.style.display='none';
 });
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.search-wrap')) acBox.style.display = 'none';
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-input') && !e.target.closest('#autocomplete'))
+    acBox.style.display = 'none';
 });
 
-async function fetchSuggestions(q) {
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  acBox.style.display = 'none';
+}
+
+async function fetchAC(q) {
   try {
-    const res  = await fetch(
+    const r = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'Accept-Language':'en' } }
     );
-    const data = await res.json();
-    if (!data.length) { acBox.style.display = 'none'; return; }
-    acBox.innerHTML = data.map(d => {
-      const name = d.display_name.split(',')[0];
-      const sub  = d.display_name.split(',').slice(1,3).join(',').trim();
-      return `<div class="ac-item" onclick="selectSuggestion('${d.display_name.replace(/'/g,"\\'")}',${d.lat},${d.lon})">
+    const d = await r.json();
+    if (!d.length) { acBox.style.display='none'; return; }
+    acBox.innerHTML = d.map(x => {
+      const nm  = x.display_name.split(',')[0];
+      const sb  = x.display_name.split(',').slice(1,3).join(',').trim();
+      return `<div class="ac-item" onclick="selectAC(${x.lat},${x.lon},'${x.display_name.replace(/'/g,"\\'")}')">
         <span class="ac-icon">📍</span>
-        <div><div class="ac-name">${name}</div><div class="ac-sub">${sub}</div></div>
+        <div><div class="ac-name">${nm}</div><div class="ac-sub">${sb}</div></div>
       </div>`;
     }).join('');
     acBox.style.display = 'block';
-  } catch(e) { acBox.style.display = 'none'; }
+  } catch(e) { acBox.style.display='none'; }
 }
 
-async function selectSuggestion(displayName, lat, lon) {
-  document.getElementById('search-input').value = displayName.split(',')[0];
+async function selectAC(lat, lon, dn) {
+  document.getElementById('search-input').value = dn.split(',')[0];
   acBox.style.display = 'none';
-  await runQuery(parseFloat(lat), parseFloat(lon), displayName);
+  await runQuery(parseFloat(lat), parseFloat(lon), dn);
 }
 
 async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
   acBox.style.display = 'none';
-
   const btn = document.getElementById('search-btn');
-  const sp  = document.getElementById('btn-spinner');
+  const sp  = document.getElementById('btn-spin');
   const bt  = document.getElementById('btn-text');
-  btn.disabled = true; sp.classList.add('on'); bt.textContent = '';
-
+  btn.disabled=true; sp.classList.add('on'); bt.textContent='';
   try {
-    const res  = await fetch(
+    const r = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'en' } }
+      { headers: { 'Accept-Language':'en' } }
     );
-    const data = await res.json();
-    if (!data.length) {
-      showError('Location not found. Try a more specific address.');
-      return;
-    }
-    await runQuery(parseFloat(data[0].lat), parseFloat(data[0].lon), data[0].display_name);
+    const d = await r.json();
+    if (!d.length) { showError('Location not found. Try a more specific address.'); return; }
+    await runQuery(parseFloat(d[0].lat), parseFloat(d[0].lon), d[0].display_name);
   } catch(e) {
-    showError('Search failed. Please check your connection and try again.');
+    showError('Search failed. Please check your connection.');
   } finally {
-    btn.disabled = false; sp.classList.remove('on'); bt.textContent = 'Go';
+    btn.disabled=false; sp.classList.remove('on'); bt.textContent='Search';
   }
 }
 
-async function runQuery(lat, lon, displayName) {
+async function runQuery(lat, lon, dn) {
   if (activeMarker) map.removeLayer(activeMarker);
-  const spinIcon = L.divIcon({
-    html: '<div class="click-ring"></div>',
-    className: '', iconSize: [28,28], iconAnchor: [14,14]
-  });
-  activeMarker = L.marker([lat, lon], { icon: spinIcon }).addTo(map);
+  activeMarker = L.marker([lat,lon], { icon: loadingMarkerIcon }).addTo(map);
   map.setView([lat, lon], 14);
-
+  const name  = dn.split(',')[0];
+  const sub   = dn.split(',').slice(1,3).join(',').trim();
+  const short = dn.split(',').slice(0,2).join(',');
   try {
-    const raw   = await queryPoint(lon, lat);
-    const name  = displayName.split(',')[0];
-    const sub   = displayName.split(',').slice(1,3).join(',').trim();
-    const short = displayName.split(',').slice(0,2).join(',');
-
+    const raw = await queryPoint(lon, lat);
     if (isNodata(raw)) {
-      activeMarker.setIcon(makeIcon('#9e9e9e'));
+      activeMarker.setIcon(makeMarker('#9e9e9e'));
       activeMarker.bindPopup(buildOutsidePopup(name)).openPopup();
-      document.getElementById('outside-card').classList.add('visible');
-      document.getElementById('result-card').classList.remove('visible');
+      document.getElementById('outside-card').classList.add('on');
+      document.getElementById('result-card').classList.remove('on');
       return;
     }
-
     const prob  = Math.min(Math.max(raw, 0), 1);
     const label = classifyRisk(prob);
-    const r     = RISKS[label];
-
-    activeMarker.setIcon(makeIcon(r.dot));
+    activeMarker.setIcon(makeMarker(RISKS[label].dot));
     activeMarker.bindPopup(buildPopup(name, sub, prob, label)).openPopup();
-    updateSidebar(short, prob, label);
-
-    if (window.innerWidth <= 700 && !drawerExpanded) {
-      drawerExpanded = true;
-      panel.classList.add('expanded');
-    }
+    updateSidebar(name, short, prob, label);
   } catch(err) {
-    activeMarker.setIcon(makeIcon('#9e9e9e'));
+    activeMarker.setIcon(makeMarker('#9e9e9e'));
     showError('Could not retrieve flood data for this location.');
   }
 }
 
 function showError(msg) {
-  const el = document.getElementById('error-msg');
-  el.textContent = msg;
-  el.classList.add('visible');
+  const el = document.getElementById('error-chip');
+  el.textContent = msg; el.classList.add('on');
 }
-
-// ── Legend interaction ───────────────────────────────────────────
-document.querySelectorAll('.legend-row').forEach(row => {
-  row.addEventListener('mouseenter', () => row.classList.add('active'));
-  row.addEventListener('mouseleave', () => row.classList.remove('active'));
-});
 </script>
 </body>
 </html>
