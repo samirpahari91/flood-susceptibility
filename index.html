@@ -1924,14 +1924,21 @@
       return { ...geometry, coordinates: coords };
     }
 
-    function getGridValue(grid, row, col) {
+    function getGridValue(grid, row, col, width) {
       if (grid == null) return undefined;
       if (Array.isArray(grid)) {
         const rowVal = grid[row];
         if (Array.isArray(rowVal) || ArrayBuffer.isView(rowVal)) return rowVal[col];
+        if (ArrayBuffer.isView(grid)) {
+          const idx = (row * width) + col;
+          return grid[idx];
+        }
         return rowVal;
       }
-      if (ArrayBuffer.isView(grid)) return grid[row];
+      if (ArrayBuffer.isView(grid)) {
+        const idx = (row * width) + col;
+        return grid[idx];
+      }
       return undefined;
     }
 
@@ -2010,10 +2017,16 @@
         for (let col = 0; col < width; col++) {
           const x = left + ((col + 0.5) * xStep);
           if (!turf.booleanPointInPolygon(turf.point([x, y]), analysisFeature)) continue;
-          const raw = getGridValue(bandGrid, row, col);
-          const value = Number(raw);
+          const raw = getGridValue(bandGrid, row, col, width);
+          let value = Number(raw);
           if (!Number.isFinite(value)) continue;
           if (nodata != null && value === Number(nodata)) continue;
+
+          if (!isUsableRasterValue(value)) {
+            if (value > 1 && value <= 100) value = value / 100;
+            else if (value > 1 && value <= 255) value = value / 255;
+          }
+
           if (isUsableRasterValue(value)) out.push(value);
         }
       }
@@ -2075,6 +2088,9 @@
           throw new Error("No valid raster pixels were found inside the selected area.");
         }
         const counts = countValuesByProbabilityBins(values, edges);
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const meanVal = values.reduce((s, v) => s + v, 0) / values.length;
 
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
