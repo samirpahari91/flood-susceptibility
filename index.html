@@ -1837,7 +1837,23 @@
       const s = String(p).trim();
       if (!s) return null;
       const m = s.match(/(\d{4,6})/);
-      return m ? Number(m[1]) : null;
+      const epsg = m ? Number(m[1]) : null;
+      if (!epsg || epsg === 0 || epsg === 32767) return null;
+      return epsg;
+    }
+
+    function extentLooksGeographic(raster) {
+      const xs = [Number(raster?.xmin), Number(raster?.xmax)];
+      const ys = [Number(raster?.ymin), Number(raster?.ymax)];
+      if (!xs.every(Number.isFinite) || !ys.every(Number.isFinite)) return false;
+      return xs.every(v => v >= -180 && v <= 180) && ys.every(v => v >= -90 && v <= 90);
+    }
+
+    function inferRasterProjection(raster) {
+      const epsg = getRasterProjectionCode(raster);
+      if (epsg) return { epsg, source: 'metadata' };
+      if (extentLooksGeographic(raster)) return { epsg: 4326, source: 'extent' };
+      return { epsg: null, source: 'unknown' };
     }
 
     async function ensureProjDefinition(epsg) {
