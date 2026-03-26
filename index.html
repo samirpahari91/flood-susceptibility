@@ -1824,18 +1824,23 @@
       const featureCollection = normalizeAOIForStats(aoiGeoJSON);
       const feature = featureCollection?.features?.[0] || null;
       const geometry = feature?.geometry || null;
+      const raster = await ensureAnalysisRaster();
+
+      if (!geometry || geometry.type !== "Polygon" || !Array.isArray(geometry.coordinates)) {
+        throw new Error("Only Polygon AOIs are supported for raster area analysis.");
+      }
+
       const candidates = [
-        featureCollection,
-        feature,
+        geometry.coordinates,
         geometry,
-        featureCollection ? JSON.stringify(featureCollection) : null,
-        geometry ? JSON.stringify(geometry) : null
+        JSON.stringify(geometry.coordinates),
+        JSON.stringify(geometry)
       ].filter(Boolean);
 
       let lastErr = null;
       for (const candidate of candidates) {
         try {
-          const result = await geoblaze.get(COG_URL, candidate, true);
+          const result = await geoblaze.get(raster, candidate, true);
           const flat = flattenDeep(result).map(Number).filter(isUsableRasterValue);
           if (flat.length) return flat;
         } catch (err) {
