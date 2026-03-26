@@ -1796,11 +1796,11 @@
       return isLast ? `${min.toFixed(2)}-1.00` : `${min.toFixed(2)}-${max.toFixed(2)}`;
     }
 
-    async function requestStatistics(statsUrl, body, contentType = "application/json") {
+    async function requestStatistics(statsUrl, body) {
       const res = await fetch(statsUrl, {
         method: "POST",
-        headers: { "Content-Type": contentType },
-        body: contentType === "application/json" ? JSON.stringify(body) : body
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(body)
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -1830,19 +1830,14 @@
 
       const aoi = normalizeAOIForStats(currentAOI);
       const edges = buildProbabilityHistogramEdges(classBreaks);
-      const histogramBins = edges.join(",");
+      const histogramBinCount = edges.length - 1;
       const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
 
       setStatus("analysis-status", "Computing class areas for the selected boundary…");
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
-        const statsUrl = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&max_size=2048&histogram_bins=${encodeURIComponent(histogramBins)}&histogram_range=0,1`;
-        let payload;
-        try {
-          payload = await requestStatistics(statsUrl, aoi, "application/json");
-        } catch (firstErr) {
-          payload = await requestStatistics(statsUrl, JSON.stringify(aoi), "text/plain");
-        }
+        const statsUrl = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&max_size=2048&histogram_bins=${histogramBinCount}&histogram_range=0,1`;
+        const payload = await requestStatistics(statsUrl, aoi);
 
         const stats = extractStatsObject(payload);
         const histogram = extractHistogram(stats);
@@ -1850,7 +1845,7 @@
           throw new Error("Histogram not found in statistics response.");
         }
 
-        const counts = histogram.counts.slice(0, 5);
+        const counts = histogram.counts.slice(0, histogramBinCount);
         const rangePairs = edges.slice(0, 5).map((start, i) => [start, edges[i + 1]]);
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
