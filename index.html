@@ -13,6 +13,8 @@
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/shpjs@6.1.0/dist/shp.min.js"></script>
+  <script src="https://unpkg.com/georaster"></script>
+  <script src="https://unpkg.com/geoblaze"></script>
   <style>
     :root {
       --brand: #0079c1;
@@ -1053,7 +1055,7 @@
             </button>
           </div>
 
-          <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. The code assumes the TiTiler statistics endpoint is available for GeoJSON polygon summaries.</div>
+          <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. AOI summaries are computed client-side from the probability raster, so they do not depend on a TiTiler statistics POST request.</div>
           <div id="analysis-status" class="status-card"></div>
 
           <div class="aoi-meta">
@@ -1148,7 +1150,7 @@
         <div class="block">
           <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
           <p class="muted">
-            Polygon analysis in this version is designed around TiTiler's geometry-based statistics workflow. If your deployment returns a slightly different statistics payload, only the statistics request or histogram parsing function should need adjustment.
+            Polygon analysis in this version runs in the browser against the COG itself. The first AOI run may take longer because the raster analysis engine is loaded client-side.
           </p>
           <p class="muted">
             Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Because your raster stores continuous probabilities from 0 to 1, the class totals are grouped using the probability breaks entered above.
@@ -1206,6 +1208,7 @@
   <script>
     const TITILER = "https://titiler.xyz";
     const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
+    let analysisRasterPromise = null;
     const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
     const DEFAULT_VIEW = [37.2473, -83.1932];
     const DEFAULT_ZOOM = 12;
@@ -1796,17 +1799,22 @@
       return isLast ? `${min.toFixed(2)}-1.00` : `${min.toFixed(2)}-${max.toFixed(2)}`;
     }
 
-    async function requestStatistics(statsUrl, body) {
-      const res = await fetch(statsUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Statistics endpoint error: ${res.status} ${text}`.trim());
+    async function ensureAnalysisRaster() {
+      if (!analysisRasterPromise) {
+        setStatus("analysis-status", "Loading raster for client-side AOI analysis…");
+        analysisRasterPromise = geoblaze.parse(COG_URL);
       }
-      return res.json();
+      return analysisRasterPromise;
+    }
+
+    function pickHistogramCounts(result) {
+      if (Array.isArray(result)) {
+        if (result.length && result[0] && Array.isArray(result[0].counts)) return result[0].counts.map(Number);
+        if (result.length && Array.isArray(result[0])) return result[0].map(Number);
+      }
+      if (result && Array.isArray(result.counts)) return result.counts.map(Number);
+      if (result && result[0] && Array.isArray(result[0].counts)) return result[0].counts.map(Number);
+      return null;
     }
 
     async function analyzeCurrentAOI() {
@@ -1829,27 +1837,32 @@
       }
 
       const aoi = normalizeAOIForStats(currentAOI);
-      const edges = buildProbabilityHistogramEdges(classBreaks);
-      const histogramBinCount = edges.length - 1;
-      const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
+      const feature = aoi?.type === "FeatureCollection" ? aoi.features?.[0] : aoi;
+      const geometry = feature?.geometry || feature;
+      if (!geometry) {
+        setStatus("analysis-status", "The selected boundary could not be converted to a polygon geometry.", "error");
+        return;
+      }
 
+      const edges = buildProbabilityHistogramEdges(classBreaks);
+      const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
       setStatus("analysis-status", "Computing class areas for the selected boundary…");
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
-        const statsUrl = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&max_size=2048&histogram_bins=${histogramBinCount}&histogram_range=0,1`;
-        const payload = await requestStatistics(statsUrl, aoi);
-
-        const stats = extractStatsObject(payload);
-        const histogram = extractHistogram(stats);
-        if (!histogram || !Array.isArray(histogram.counts) || histogram.counts.length < 5) {
-          throw new Error("Histogram not found in statistics response.");
+        const raster = await ensureAnalysisRaster();
+        const histResult = await geoblaze.histogram(raster, geometry, {
+          scaleType: "ratio",
+          numClasses: 5,
+          classType: "equal-interval"
+        });
+        const counts = pickHistogramCounts(histResult);
+        if (!counts || counts.length < 5) {
+          throw new Error("Histogram could not be computed from the raster within the selected area.");
         }
 
-        const counts = histogram.counts.slice(0, histogramBinCount);
-        const rangePairs = edges.slice(0, 5).map((start, i) => [start, edges[i + 1]]);
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
-          rangeLabel: formatRangeLabel(rangePairs[i][0], rangePairs[i][1], i === 4),
+          rangeLabel: formatRangeLabel(edges[i], edges[i + 1], i === 4),
           count: Number(counts[i] || 0),
           area: Number(counts[i] || 0) * pixelAreaSqKm,
           color: RISK_CONFIG[name].color
