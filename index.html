@@ -1150,7 +1150,7 @@
         <div class="block">
           <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
           <p class="muted">
-            Polygon analysis in this version runs in the browser against the COG itself. The first AOI run may take longer because the raster values are read client-side before the class totals are summarized.
+            Polygon analysis in this version reads only the raster window needed for the selected AOI. The first run may still take a moment, but it should avoid downloading the full raster before analysis.
           </p>
           <p class="muted">
             Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Because your raster stores continuous probabilities from 0 to 1, the class totals are grouped using the probability breaks entered above.
@@ -1801,12 +1801,13 @@
 
     async function ensureAnalysisRaster() {
       if (!analysisRasterPromise) {
-        setStatus("analysis-status", "Loading raster for client-side AOI analysis…");
+        setStatus("analysis-status", "Opening raster for AOI analysis…");
         analysisRasterPromise = (async () => {
-          const resp = await fetch(COG_URL);
-          if (!resp.ok) throw new Error(`Raster download failed: ${resp.status} ${resp.statusText}`);
-          const arr = await resp.arrayBuffer();
-          return await parseGeoraster(arr);
+          try {
+            return await parseGeoraster(COG_URL, { readOnDemand: true });
+          } catch (err) {
+            throw new Error(`Raster could not be opened for on-demand reading: ${err.message || err}`);
+          }
         })();
       }
       return analysisRasterPromise;
@@ -1943,7 +1944,7 @@
 
       const edges = buildProbabilityHistogramEdges(classBreaks);
       const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
-      setStatus("analysis-status", "Computing class areas for the selected boundary…");
+      setStatus("analysis-status", "Opening raster and computing class areas for the selected boundary…");
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
         await ensureAnalysisRaster();
