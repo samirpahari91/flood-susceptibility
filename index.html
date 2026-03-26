@@ -1015,7 +1015,7 @@
       <section class="panel-view" id="view-analyze">
         <div class="block">
           <div class="block-title"><h3>Area analysis</h3><span>polygon summary</span></div>
-          <p class="muted">Use a drawn or uploaded polygon to summarize the total area in each of the five susceptibility classes. Area is reported in square kilometers.</p>
+          <p class="muted">Use a drawn or uploaded polygon to summarize the total area in each of the five qualitative susceptibility classes. The underlying raster stores continuous probability values from 0 to 1, and classes are computed using the probability thresholds below. Area is reported in square kilometers.</p>
 
           <div class="grid-2" style="margin-top:12px;">
             <div>
@@ -1026,6 +1026,12 @@
               <label class="input-label" for="upload-zip">Upload watershed shapefile</label>
               <input class="file-input" id="upload-zip" type="file" accept=".zip,.geojson,.json" />
             </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <label class="input-label" for="class-breaks">Probability class breaks</label>
+            <input class="text-input" id="class-breaks" type="text" value="0.2,0.4,0.6,0.8" />
+            <div class="muted" style="margin-top:6px;">These are the equal-width probability thresholds used to group the continuous 0-1 raster into Very Low, Low, Moderate, High, and Very High.</div>
           </div>
 
           <div class="tool-grid">
@@ -1142,10 +1148,10 @@
         <div class="block">
           <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
           <p class="muted">
-            Polygon analysis in this version is designed around TiTiler's geometry-based statistics workflow. If your deployment returns a slightly different statistics payload, only the histogram parsing function should need adjustment.
+            Polygon analysis in this version is designed around TiTiler's geometry-based statistics workflow. If your deployment returns a slightly different statistics payload, only the statistics request or histogram parsing function should need adjustment.
           </p>
           <p class="muted">
-            Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Update that value to the true cell size of your production raster before publishing.
+            Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Because your raster stores continuous probabilities from 0 to 1, the class totals are grouped using the probability breaks entered above.
           </p>
           <p class="muted">
             Upload support accepts <strong>.zip shapefiles</strong> or GeoJSON. For shapefiles, package the .shp, .dbf, .shx, and .prj files together in one ZIP archive.
@@ -1717,11 +1723,34 @@
       }
     });
 
+    function normalizeAOIForStats(input) {
+      if (!input) return null;
+      if (input.type === "FeatureCollection") return input;
+      if (input.type === "Feature") return { type: "FeatureCollection", features: [input] };
+      if (input.type === "Polygon" || input.type === "MultiPolygon") {
+        return { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: input }] };
+      }
+      return input;
+    }
+
+    function getPreferredBandKey(obj) {
+      if (!obj || typeof obj !== "object") return null;
+      const keys = Object.keys(obj);
+      return keys.find(k => /^b\d+$/i.test(k)) || keys.find(k => /^band/i.test(k)) || keys[0] || null;
+    }
+
     function extractStatsObject(payload) {
       if (!payload || typeof payload !== "object") return null;
-      if (payload.b1) return payload.b1;
-      if (payload.statistics?.b1) return payload.statistics.b1;
-      if (payload.properties?.statistics?.b1) return payload.properties.statistics.b1;
+      const directKey = getPreferredBandKey(payload);
+      if (directKey && payload[directKey] && typeof payload[directKey] === "object") return payload[directKey];
+      if (payload.statistics && typeof payload.statistics === "object") {
+        const statKey = getPreferredBandKey(payload.statistics);
+        if (statKey) return payload.statistics[statKey];
+      }
+      if (payload.properties?.statistics && typeof payload.properties.statistics === "object") {
+        const propKey = getPreferredBandKey(payload.properties.statistics);
+        if (propKey) return payload.properties.statistics[propKey];
+      }
       for (const value of Object.values(payload)) {
         if (value && typeof value === "object") {
           const found = extractStatsObject(value);
@@ -1735,12 +1764,49 @@
       if (!stats) return null;
       const h = stats.histogram;
       if (Array.isArray(h) && h.length === 2 && Array.isArray(h[0]) && Array.isArray(h[1])) {
-        return { counts: h[0].map(Number), bins: h[1].map(Number) };
+        const a = h[0].map(Number);
+        const b = h[1].map(Number);
+        if (b.length === a.length + 1) return { counts: a, bins: b };
+        if (a.length === b.length + 1) return { counts: b, bins: a };
+        return { counts: a, bins: b };
       }
       if (h && Array.isArray(h.counts) && Array.isArray(h.bins)) {
         return { counts: h.counts.map(Number), bins: h.bins.map(Number) };
       }
       return null;
+    }
+
+    function parseClassBreaks() {
+      const raw = document.getElementById("class-breaks").value;
+      const vals = raw.split(",").map(v => Number(v.trim())).filter(v => Number.isFinite(v));
+      if (vals.length !== 4) throw new Error("Enter exactly four probability breaks, for example 0.2,0.4,0.6,0.8.");
+      const sorted = [...vals].sort((a, b) => a - b);
+      if (sorted.some(v => v <= 0 || v >= 1)) throw new Error("Probability breaks must be greater than 0 and less than 1.");
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] <= sorted[i - 1]) throw new Error("Probability breaks must be strictly increasing.");
+      }
+      return sorted;
+    }
+
+    function buildProbabilityHistogramEdges(breaks) {
+      return [0, ...breaks, 1];
+    }
+
+    function formatRangeLabel(min, max, isLast = false) {
+      return isLast ? `${min.toFixed(2)}-1.00` : `${min.toFixed(2)}-${max.toFixed(2)}`;
+    }
+
+    async function requestStatistics(statsUrl, body, contentType = "application/json") {
+      const res = await fetch(statsUrl, {
+        method: "POST",
+        headers: { "Content-Type": contentType },
+        body: contentType === "application/json" ? JSON.stringify(body) : body
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Statistics endpoint error: ${res.status} ${text}`.trim());
+      }
+      return res.json();
     }
 
     async function analyzeCurrentAOI() {
@@ -1754,25 +1820,41 @@
         return;
       }
 
+      let classBreaks;
+      try {
+        classBreaks = parseClassBreaks();
+      } catch (err) {
+        setStatus("analysis-status", err.message, "error");
+        return;
+      }
+
+      const aoi = normalizeAOIForStats(currentAOI);
+      const edges = buildProbabilityHistogramEdges(classBreaks);
+      const histogramBins = edges.join(",");
+      const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
+
       setStatus("analysis-status", "Computing class areas for the selected boundary…");
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
-        const url = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&histogram_bins=5&histogram_range=0,1`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(currentAOI)
-        });
-        if (!res.ok) throw new Error(`Statistics endpoint error: ${res.status}`);
-        const payload = await res.json();
+        const statsUrl = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&max_size=2048&histogram_bins=${encodeURIComponent(histogramBins)}&histogram_range=0,1`;
+        let payload;
+        try {
+          payload = await requestStatistics(statsUrl, aoi, "application/json");
+        } catch (firstErr) {
+          payload = await requestStatistics(statsUrl, JSON.stringify(aoi), "text/plain");
+        }
+
         const stats = extractStatsObject(payload);
         const histogram = extractHistogram(stats);
-        if (!histogram) throw new Error("Histogram not found in statistics response.");
+        if (!histogram || !Array.isArray(histogram.counts) || histogram.counts.length < 5) {
+          throw new Error("Histogram not found in statistics response.");
+        }
 
         const counts = histogram.counts.slice(0, 5);
-        const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
+        const rangePairs = edges.slice(0, 5).map((start, i) => [start, edges[i + 1]]);
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
+          rangeLabel: formatRangeLabel(rangePairs[i][0], rangePairs[i][1], i === 4),
           count: Number(counts[i] || 0),
           area: Number(counts[i] || 0) * pixelAreaSqKm,
           color: RISK_CONFIG[name].color
@@ -1786,7 +1868,7 @@
         showToast("Area analysis complete.", "success");
       } catch (err) {
         console.error(err);
-        setStatus("analysis-status", "Area analysis failed. If your TiTiler deployment returns a different statistics payload, adjust the histogram parsing logic.", "error");
+        setStatus("analysis-status", `Area analysis failed: ${err.message}`, "error");
         document.getElementById("aoi-status-text").textContent = "Failed";
       }
     }
