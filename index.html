@@ -1,1404 +1,1825 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Flood Susceptibility — North Fork Kentucky River Watershed</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Averia+Sans+Libre&family=Source+Sans+3:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Susceptibility Explorer — North Fork Kentucky River Basin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/shpjs@6.1.0/dist/shp.min.js"></script>
   <style>
-    /* ── Design tokens (Calcite-inspired) ────────── */
     :root {
-      --brand:         #0079c1;
-      --brand-dark:    #005a8c;
-      --brand-light:   #e8f4fb;
-      --brand-hover:   #00598c;
-      --header-bg:     #1a2731;
-      --header-border: #2c3e4d;
-      --panel-bg:      #f8f8f8;
-      --panel-border:  #d4d4d4;
-      --surface:       #ffffff;
-      --surface-hover: #f0f0f0;
-      --divider:       #e8e8e8;
-      --text-1:        #1a1a1a;
-      --text-2:        #404040;
-      --text-3:        #6e6e6e;
-      --text-4:        #9e9e9e;
-      --focus:         rgba(0,121,193,.25);
-      --shadow-sm:     0 1px 2px rgba(0,0,0,.16);
-      --shadow-md:     0 2px 8px rgba(0,0,0,.16);
-      --shadow-lg:     0 4px 16px rgba(0,0,0,.2);
-      --radius-xs:     2px;
-      --radius-sm:     4px;
-      --radius-md:     6px;
-      --panel-w:       330px;
+      --brand: #0079c1;
+      --brand-dark: #005a8c;
+      --brand-soft: #eaf4fb;
+      --ink-900: #18232d;
+      --ink-800: #243746;
+      --ink-700: #3c5568;
+      --ink-600: #587181;
+      --ink-500: #7b919f;
+      --ink-400: #a8b7c3;
+      --ink-300: #d7e0e7;
+      --ink-200: #e7edf2;
+      --ink-100: #f5f7fa;
+      --surface: #ffffff;
+      --panel: #fbfcfd;
+      --divider: #e3e8ed;
+      --shadow-sm: 0 1px 3px rgba(24,35,45,.08);
+      --shadow-md: 0 8px 24px rgba(24,35,45,.12);
+      --shadow-lg: 0 12px 32px rgba(24,35,45,.18);
+      --radius-xs: 6px;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --panel-w: 380px;
+      --header-h: 60px;
 
-      /* Risk colors */
-      --vl-c:#1a9641; --vl-bg:#e9f5ec; --vl-bd:#a5d6a7; --vl-fg:#1b5e20;
-      --lo-c:#6ab04c; --lo-bg:#f1f8e9; --lo-bd:#b9dba2; --lo-fg:#33691e;
-      --mo-c:#e6b800; --mo-bg:#fefce8; --mo-bd:#fde68a; --mo-fg:#78520a;
-      --hi-c:#e07c00; --hi-bg:#fff4e8; --hi-bd:#fcd8a8; --hi-fg:#7c3200;
-      --vh-c:#d7191c; --vh-bg:#feecec; --vh-bd:#f5a5a5; --vh-fg:#7b1c1c;
+      --vl: #1a9641;
+      --lo: #7fbf3f;
+      --mo: #e8c547;
+      --hi: #f18f3b;
+      --vh: #d7263d;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; font-family: 'Source Sans 3', 'Avenir Next', Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: Inter, Arial, sans-serif;
+      color: var(--ink-900);
+      background: var(--ink-100);
+    }
+    button, input, select { font: inherit; }
 
-    /* ── Header ─────────────────────────────────── */
     #header {
       position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 50px;
-      background: var(--header-bg);
-      border-bottom: 1px solid var(--header-border);
+      inset: 0 0 auto 0;
+      height: var(--header-h);
+      background: linear-gradient(180deg, #18232d 0%, #1d2b36 100%);
+      color: white;
       display: flex;
       align-items: center;
-      padding: 0 12px;
-      gap: 0;
+      gap: 14px;
+      padding: 0 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
       z-index: 1000;
-      user-select: none;
     }
-    .hdr-product {
+    .brand {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 0 14px 0 4px;
-      border-right: 1px solid var(--header-border);
-      height: 100%;
+      gap: 12px;
+      min-width: 0;
     }
-    .hdr-icon {
-      width: 30px; height: 30px;
-      background: var(--brand);
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #0b95eb, #0079c1);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+      flex: 0 0 auto;
     }
-    .hdr-name {
+    .brand-mark svg { width: 19px; height: 19px; fill: none; stroke: white; stroke-width: 1.8; }
+    .brand-text { min-width: 0; }
+    .brand-name {
       font-size: 15px;
-      font-weight: 600;
-      color: #ffffff;
+      font-weight: 700;
       letter-spacing: .01em;
     }
-    .hdr-divider { width: 1px; height: 24px; background: var(--header-border); margin: 0 14px; }
-    .hdr-title {
-      font-size: 14px;
-      color: #c8d4dc;
-      font-weight: 400;
+    .brand-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,.72);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .hdr-spacer { flex: 1; }
-    .hdr-tag {
+    .header-spacer { flex: 1; }
+    .header-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.92);
       font-size: 11px;
       font-weight: 600;
-      color: var(--brand);
-      background: rgba(0,121,193,.15);
-      border: 1px solid rgba(0,121,193,.35);
-      padding: 3px 9px;
-      border-radius: var(--radius-sm);
-      letter-spacing: .04em;
+      letter-spacing: .05em;
       text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,.08);
     }
-    .hdr-btn {
-      width: 32px; height: 32px;
-      border: none;
-      background: transparent;
-      color: #c8d4dc;
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+      border-radius: 10px;
+      color: white;
       cursor: pointer;
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
-      transition: background .15s;
-      margin-left: 4px;
+      display: grid;
+      place-items: center;
+      transition: .18s ease;
     }
-    .hdr-btn:hover { background: rgba(255,255,255,.1); color: white; }
+    .icon-btn:hover { background: rgba(255,255,255,.1); }
+    .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 
-    /* ── Full-screen map ─────────────────────────── */
     #map {
       position: fixed;
-      top: 50px; left: 0; right: 0; bottom: 0;
-      z-index: 0;
-      cursor: crosshair;
+      inset: var(--header-h) 0 0 0;
+      z-index: 1;
+      background: #dfe7ed;
     }
 
-    /* ── Left panel ──────────────────────────────── */
     #panel {
       position: fixed;
-      top: 50px;
+      top: var(--header-h);
       left: 0;
       bottom: 0;
       width: var(--panel-w);
-      background: var(--panel-bg);
-      border-right: 1px solid var(--panel-border);
+      background: rgba(251,252,253,.98);
+      border-right: 1px solid var(--divider);
+      z-index: 500;
       display: flex;
       flex-direction: column;
-      z-index: 500;
-      transition: transform .25s ease;
       box-shadow: var(--shadow-md);
+      transition: transform .24s ease;
+      backdrop-filter: blur(10px);
     }
     #panel.collapsed { transform: translateX(calc(-1 * var(--panel-w))); }
-
-    /* Panel toggle tab on edge */
     #panel-tab {
       position: fixed;
-      top: 50%;
+      top: calc(var(--header-h) + 50% - 30px);
       left: var(--panel-w);
-      transform: translateY(-50%);
-      width: 16px;
-      height: 56px;
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-border);
-      border-left: none;
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 501;
-      transition: left .25s ease;
-      box-shadow: 2px 0 4px rgba(0,0,0,.1);
-    }
-    #panel-tab:hover { background: var(--surface-hover); }
-    #panel-tab svg { width: 10px; height: 10px; fill: var(--text-3); }
-    #panel.collapsed + #panel-tab { left: 0; }
-    #panel.collapsed + #panel-tab .arrow { transform: rotate(180deg); }
-
-    /* Panel header */
-    .panel-hdr {
-      padding: 0 12px;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      width: 18px;
+      height: 60px;
       background: var(--surface);
-      border-bottom: 1px solid var(--divider);
-      flex-shrink: 0;
+      border: 1px solid var(--divider);
+      border-left: 0;
+      border-radius: 0 12px 12px 0;
+      display: grid;
+      place-items: center;
+      z-index: 501;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: left .24s ease;
     }
-    .panel-hdr-icon { font-size: 14px; }
-    .panel-hdr-title {
+    #panel.collapsed + #panel-tab { left: 0; }
+    #panel-tab svg {
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: var(--ink-700);
+      stroke-width: 1.8;
+      transition: transform .24s ease;
+    }
+    #panel.collapsed + #panel-tab svg { transform: rotate(180deg); }
+
+    .panel-top {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--divider);
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+    }
+    .panel-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--brand-dark);
+      margin-bottom: 8px;
+    }
+    .panel-title {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      margin: 0 0 6px;
+      color: var(--ink-900);
+    }
+    .panel-desc {
+      margin: 0;
       font-size: 13px;
-      font-weight: 600;
-      color: var(--text-1);
+      line-height: 1.55;
+      color: var(--ink-700);
+    }
+    .mode-tabs {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .mode-tab {
+      border: 1px solid var(--divider);
+      background: white;
+      color: var(--ink-700);
+      border-radius: 12px;
+      padding: 9px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      transition: .16s ease;
+    }
+    .mode-tab:hover { border-color: #b9cfde; background: #f9fbfd; }
+    .mode-tab.active {
+      color: white;
+      border-color: var(--brand);
+      background: linear-gradient(180deg, #0b95eb 0%, #0079c1 100%);
+      box-shadow: 0 6px 16px rgba(0,121,193,.2);
     }
 
-    /* Panel sections */
     .panel-scroll {
       flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: auto;
+      padding: 14px;
     }
-    .panel-scroll::-webkit-scrollbar { width: 6px; }
-    .panel-scroll::-webkit-scrollbar-track { background: transparent; }
-    .panel-scroll::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
-    .panel-scroll::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+    .panel-scroll::-webkit-scrollbar { width: 8px; }
+    .panel-scroll::-webkit-scrollbar-thumb { background: #cad5de; border-radius: 999px; }
 
-    .section {
-      border-bottom: 1px solid var(--divider);
+    .panel-view { display: none; }
+    .panel-view.active { display: block; }
+
+    .block {
+      background: var(--surface);
+      border: 1px solid var(--divider);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 12px;
     }
-    .section-hdr {
-      padding: 0 12px;
-      height: 38px;
+    .block-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      background: var(--surface);
-      transition: background .15s;
+      gap: 8px;
+      margin-bottom: 10px;
     }
-    .section-hdr:hover { background: var(--surface-hover); }
-    .section-hdr-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-2);
+    .block-title h3 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: .06em;
+      letter-spacing: .07em;
+      color: var(--ink-700);
     }
-    .section-hdr-arrow {
+    .block-title span {
       font-size: 11px;
-      color: var(--text-4);
-      transition: transform .2s;
+      color: var(--ink-500);
     }
-    .section-hdr.open .section-hdr-arrow { transform: rotate(180deg); }
-    .section-body {
-      padding: 10px 12px;
-      background: var(--panel-bg);
+    .muted {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--ink-700);
     }
-    .section-body.hidden { display: none; }
 
-    /* ── Search ──────────────────────────────────── */
-    .search-bar {
-      display: flex;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      overflow: visible;
+    .search-shell {
       position: relative;
-      transition: border-color .2s, box-shadow .2s;
-    }
-    .search-bar:focus-within {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 2px var(--focus);
-    }
-    .search-bar-icon {
-      padding: 0 10px;
-      color: var(--text-4);
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-    #search-input {
-      flex: 1;
-      border: none;
-      outline: none;
-      font-family: inherit;
-      font-size: 13px;
-      color: var(--text-1);
-      padding: 8px 0;
-      background: transparent;
-    }
-    #search-input::placeholder { color: var(--text-4); }
-    #search-clear {
-      padding: 0 8px;
-      color: var(--text-4);
-      font-size: 16px;
-      cursor: pointer;
-      display: none;
-      line-height: 1;
-      border: none;
-      background: transparent;
-    }
-    #search-clear:hover { color: var(--text-2); }
-    #search-btn {
-      height: 100%;
-      padding: 0 12px;
-      background: var(--brand);
-      color: white;
-      border: none;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex; align-items: center; gap: 5px;
-      transition: background .15s;
-      border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
-      flex-shrink: 0;
-    }
-    #search-btn:hover { background: var(--brand-hover); }
-    #search-btn:disabled { background: var(--text-4); cursor: not-allowed; }
-
-    /* Autocomplete */
-    #autocomplete {
-      position: absolute;
-      top: calc(100% + 2px);
-      left: -1px; right: -1px;
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      box-shadow: var(--shadow-lg);
-      z-index: 999;
-      overflow: hidden;
-      display: none;
-    }
-    .ac-item {
-      padding: 8px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--text-1);
-      border-bottom: 1px solid var(--divider);
-      transition: background .12s;
-      display: flex; align-items: flex-start; gap: 8px;
-    }
-    .ac-item:last-child { border-bottom: none; }
-    .ac-item:hover { background: var(--brand-light); }
-    .ac-icon { color: var(--brand); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
-    .ac-name { font-weight: 600; font-size: 13px; }
-    .ac-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-
-    .error-chip {
-      display: none;
-      margin-top: 6px;
-      background: #feecec;
-      border: 1px solid var(--vh-bd);
-      border-radius: var(--radius-sm);
-      padding: 7px 10px;
-      font-size: 12px;
-      color: var(--vh-fg);
-    }
-    .error-chip.on { display: block; }
-
-    /* ── Result card ─────────────────────────────── */
-    .result-card {
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      display: none;
-      animation: fadeSlide .25s ease;
-    }
-    .result-card.on { display: block; }
-    @keyframes fadeSlide {
-      from { opacity:0; transform:translateY(-4px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    .rc-top {
-      padding: 10px 12px;
-      display: flex; align-items: flex-start; gap: 8px;
-    }
-    .rc-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 3px;
-    }
-    .rc-loc {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-1);
-      line-height: 1.3;
-    }
-    .rc-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-    .rc-band {
-      padding: 8px 12px;
-      font-size: 13px;
-      font-weight: 700;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .rc-score-row {
-      padding: 2px 12px 4px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .rc-score-lbl { font-size: 11px; color: var(--text-3); }
-    .rc-score-val {
-      font-family: 'Source Code Pro', monospace;
-      font-size: 12px;
-      color: var(--text-2);
-    }
-    .rc-track {
-      margin: 0 12px 4px;
-      height: 4px;
-      background: #e8e8e8;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .rc-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
-    .rc-ends {
-      display: flex; justify-content: space-between;
-      margin: 0 12px 10px;
-      font-size: 10px;
-      color: var(--text-4);
-    }
-    .rc-advisory {
-      margin: 0 12px 12px;
-      padding: 9px 11px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      line-height: 1.6;
-      border-left: 3px solid;
-    }
-
-    /* Outside card */
-    .outside-card {
-      background: #fef3c7;
-      border: 1px solid #fcd34d;
-      border-radius: var(--radius-sm);
-      padding: 9px 11px;
-      font-size: 12px;
-      color: #78350f;
-      line-height: 1.5;
-      display: none;
-    }
-    .outside-card.on { display: block; }
-
-    /* ── Stats row ───────────────────────────────── */
-    .stats-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-bottom: 10px;
     }
-    .stat-tile {
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      padding: 8px 10px;
-    }
-    .stat-val {
-      font-family: 'Source Code Pro', monospace;
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--brand-dark);
-      line-height: 1;
-    }
-    .stat-lbl {
-      font-size: 10px;
-      color: var(--text-3);
-      margin-top: 3px;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-    }
-
-    /* ── Legend ──────────────────────────────────── */
-    .legend-item {
+    .search-wrap {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 8px;
-      border-radius: var(--radius-sm);
-      cursor: default;
-      transition: background .12s;
+      background: white;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 0 12px;
+      transition: .16s ease;
     }
-    .legend-item:hover { background: var(--brand-light); }
-    .legend-patch {
-      width: 18px; height: 18px;
-      border-radius: var(--radius-xs);
-      flex-shrink: 0;
-      border: 1px solid rgba(0,0,0,.12);
+    .search-wrap:focus-within {
+      border-color: #95bfd7;
+      box-shadow: 0 0 0 4px rgba(0,121,193,.12);
     }
-    .legend-lbl { font-size: 13px; color: var(--text-2); font-weight: 400; }
-    .legend-range {
-      margin-left: auto;
-      font-family: 'Source Code Pro', monospace;
-      font-size: 10px;
-      color: var(--text-4);
+    .search-wrap svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: var(--ink-500);
+      stroke-width: 1.8;
+      flex: 0 0 auto;
     }
-
-    /* ── Basemap gallery ─────────────────────────── */
-    .bm-gallery {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-    }
-    .bm-tile {
-      border: 2px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      cursor: pointer;
-      background: none;
-      padding: 0;
-      text-align: left;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    .bm-tile:hover { border-color: var(--brand); }
-    .bm-tile.active {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 2px rgba(0,121,193,.3);
-    }
-    .bm-thumb {
+    #search-input {
       width: 100%;
-      padding-top: 65%;
-      position: relative;
-      overflow: hidden;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink-900);
+      font-size: 14px;
+      padding: 12px 0;
     }
-    .bm-thumb-inner {
+    #search-clear {
+      border: 0;
+      background: transparent;
+      color: var(--ink-500);
+      cursor: pointer;
+      display: none;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+    .primary-btn, .ghost-btn, .tool-action {
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: .16s ease;
+    }
+    .primary-btn {
+      border: 1px solid var(--brand);
+      background: linear-gradient(180deg, #0b95eb 0%, #0079c1 100%);
+      color: white;
+      padding: 0 14px;
+      min-height: 44px;
+      box-shadow: 0 8px 18px rgba(0,121,193,.18);
+    }
+    .primary-btn:hover { filter: brightness(.98); }
+    .primary-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .ghost-btn {
+      border: 1px solid var(--divider);
+      background: white;
+      color: var(--ink-800);
+      padding: 10px 12px;
+    }
+    .ghost-btn:hover { background: #f8fafc; border-color: #c8d5df; }
+    .autocomplete {
       position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
+      left: 0;
+      right: 82px;
+      top: calc(100% + 6px);
+      display: none;
+      background: white;
+      border: 1px solid var(--divider);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      z-index: 900;
     }
-    .bm-label-strip {
-      padding: 4px 6px;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-2);
-      background: var(--surface);
-      border-top: 1px solid var(--divider);
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-    .bm-tile.active .bm-label-strip { color: var(--brand); background: var(--brand-light); }
-
-    /* Basemap preview backgrounds */
-    .bmt-streets  { background: #f0ebe3; }
-    .bmt-satellite{ background: #1c2b1c; }
-    .bmt-topo     { background: #cfd8b0; }
-    .bmt-dark     { background: #1a2333; }
-    .bmt-light    { background: #f5f4f1; }
-    .bmt-terrain  { background: #b8c89a; }
-
-    /* ── Layer control ───────────────────────────── */
-    .layer-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 6px 8px;
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-    }
-    .layer-vis-btn {
-      width: 22px; height: 22px;
-      border: 1px solid var(--panel-border);
-      background: var(--surface);
-      border-radius: var(--radius-xs);
+    .ac-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--divider);
       cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px;
-      flex-shrink: 0;
-      transition: background .12s;
+      transition: .12s ease;
     }
-    .layer-vis-btn:hover { background: var(--surface-hover); }
-    .layer-vis-btn.off { opacity: .4; }
-    .layer-name { font-size: 13px; color: var(--text-1); flex: 1; font-weight: 500; }
-    .layer-opacity-wrap {
-      display: flex; align-items: center; gap: 6px;
-      margin-top: 6px;
-    }
-    .layer-opacity-lbl { font-size: 11px; color: var(--text-3); }
-    .layer-opacity-val {
-      font-family: 'Source Code Pro', monospace;
-      font-size: 11px;
-      color: var(--text-3);
-      min-width: 28px;
-    }
-    input[type=range] {
-      flex: 1;
-      accent-color: var(--brand);
-      cursor: pointer;
-    }
+    .ac-item:last-child { border-bottom: 0; }
+    .ac-item:hover { background: var(--brand-soft); }
+    .ac-title { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+    .ac-sub { font-size: 11px; color: var(--ink-600); margin-top: 2px; }
 
-    /* ── Click hint ──────────────────────────────── */
-    .click-hint {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 10px;
-      background: var(--brand-light);
-      border: 1px solid rgba(0,121,193,.25);
-      border-radius: var(--radius-sm);
+    .hint-card, .status-card {
+      padding: 11px 12px;
+      border-radius: 12px;
       font-size: 12px;
+      line-height: 1.55;
+    }
+    .hint-card {
+      background: linear-gradient(180deg, #f6fbff 0%, #eff7fd 100%);
+      border: 1px solid #cfe2ef;
       color: var(--brand-dark);
     }
+    .status-card {
+      display: none;
+      background: #fff7e7;
+      border: 1px solid #f2db9d;
+      color: #7a5a00;
+      margin-top: 10px;
+    }
+    .status-card.on { display: block; }
+    .status-card.error {
+      background: #fff1f1;
+      border-color: #efb3b9;
+      color: #972a36;
+    }
 
-    /* ── Right toolbar (map tools) ───────────────── */
-    #toolbar {
-      position: fixed;
-      top: 60px;
-      right: 12px;
+    .result-card {
+      display: none;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--divider);
+      background: white;
+      margin-top: 12px;
+    }
+    .result-card.on { display: block; }
+    .result-head {
+      padding: 14px;
       display: flex;
-      flex-direction: column;
-      z-index: 400;
-      background: var(--surface);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius-sm);
-      box-shadow: var(--shadow-md);
+      gap: 10px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--divider);
+    }
+    .result-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      margin-top: 5px;
+      flex: 0 0 auto;
+    }
+    .result-loc {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--ink-900);
+      line-height: 1.25;
+    }
+    .result-sub {
+      font-size: 12px;
+      color: var(--ink-600);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .risk-band {
+      margin: 14px 14px 10px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid transparent;
+    }
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 0 14px 10px;
+    }
+    .metric-card {
+      background: #f8fafc;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 10px 11px;
+    }
+    .metric-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-500);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .metric-value {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink-900);
+    }
+    .metric-value.code {
+      font-family: "Source Code Pro", monospace;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .score-block {
+      padding: 0 14px 12px;
+    }
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--ink-700);
+      margin-bottom: 7px;
+    }
+    .score-row strong {
+      font-family: "Source Code Pro", monospace;
+      font-size: 12px;
+      color: var(--ink-900);
+    }
+    .track {
+      height: 8px;
+      border-radius: 999px;
+      background: #ebeff3;
       overflow: hidden;
     }
-    .tool-btn {
-      width: 32px; height: 32px;
-      border: none;
-      background: var(--surface);
-      color: var(--text-2);
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
-      font-weight: 700;
-      transition: background .12s, color .12s;
-      border-bottom: 1px solid var(--divider);
-      position: relative;
+    .fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      transition: width .5s ease;
     }
-    .tool-btn:last-child { border-bottom: none; }
-    .tool-btn:hover { background: var(--brand-light); color: var(--brand); }
-    .tool-btn.active { background: var(--brand); color: white; }
-    .tool-btn[title]:hover::after {
+    .score-ends {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--ink-500);
+    }
+    .advisory {
+      margin: 0 14px 14px;
+      border-radius: 14px;
+      padding: 11px 12px;
+      border-left: 4px solid transparent;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      padding: 0 14px 14px;
+    }
+    .result-actions .ghost-btn { flex: 1; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .input-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink-600);
+      margin-bottom: 6px;
+    }
+    .number-input, .file-input {
+      width: 100%;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      background: white;
+      padding: 10px 12px;
+      color: var(--ink-900);
+      min-height: 44px;
+    }
+    .tool-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .tool-action {
+      border: 1px solid var(--divider);
+      background: #fff;
+      color: var(--ink-800);
+      min-height: 44px;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .tool-action:hover { background: #f8fafc; border-color: #c9d6df; }
+    .tool-action.active {
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      border-color: #a9cfe5;
+      box-shadow: inset 0 0 0 1px rgba(0,121,193,.12);
+    }
+    .tool-action small {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ink-500);
+    }
+    .tool-action.active small { color: var(--brand-dark); }
+
+    .aoi-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .small-stat {
+      background: #f8fafc;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .small-stat .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-500);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .small-stat .value {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink-900);
+    }
+
+    .analysis-card {
+      display: none;
+      margin-top: 12px;
+      border: 1px solid var(--divider);
+      border-radius: 16px;
+      background: white;
+      overflow: hidden;
+    }
+    .analysis-card.on { display: block; }
+    .analysis-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .analysis-head h4 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink-900);
+    }
+    .analysis-head span {
+      font-size: 11px;
+      color: var(--ink-500);
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .analysis-summary {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .summary-box {
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid var(--divider);
+      padding: 10px;
+    }
+    .summary-box .lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-500);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .summary-box .val {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--ink-900);
+    }
+    .class-table {
+      padding: 10px 14px 14px;
+    }
+    .class-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 74px 74px;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--divider);
+    }
+    .class-row:last-child { border-bottom: 0; }
+    .class-name {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-900);
+    }
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .bar-wrap {
+      height: 10px;
+      border-radius: 999px;
+      background: #edf1f5;
+      overflow: hidden;
+    }
+    .bar {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      transition: width .5s ease;
+    }
+    .class-area, .class-share {
+      font-size: 12px;
+      color: var(--ink-700);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stats-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .stats-tile {
+      background: white;
+      border: 1px solid var(--divider);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .stats-tile .value {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--brand-dark);
+      line-height: 1;
+    }
+    .stats-tile .label {
+      margin-top: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-500);
+      font-weight: 700;
+    }
+
+    .legend-list { display: grid; gap: 8px; }
+    .legend-item {
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid var(--divider);
+    }
+    .legend-item .name { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+    .legend-item .range { font-size: 11px; color: var(--ink-500); font-family: "Source Code Pro", monospace; }
+
+    #toolbar {
+      position: fixed;
+      top: calc(var(--header-h) + 12px);
+      right: 12px;
+      z-index: 450;
+      background: rgba(255,255,255,.95);
+      border: 1px solid var(--divider);
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+    .map-tool {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      border-bottom: 1px solid var(--divider);
+      background: transparent;
+      color: var(--ink-800);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      position: relative;
+      transition: .15s ease;
+    }
+    .map-tool:last-child { border-bottom: 0; }
+    .map-tool:hover { background: var(--brand-soft); color: var(--brand-dark); }
+    .map-tool svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+    .map-tool[title]:hover::after {
       content: attr(title);
       position: absolute;
-      right: calc(100% + 6px);
+      right: calc(100% + 8px);
       top: 50%;
       transform: translateY(-50%);
-      background: var(--header-bg);
+      background: #18232d;
       color: white;
       font-size: 11px;
-      padding: 4px 8px;
-      border-radius: var(--radius-xs);
+      padding: 6px 8px;
+      border-radius: 8px;
       white-space: nowrap;
       pointer-events: none;
     }
 
-    /* ── Scale bar / attribution bar ─────────────── */
     #bottom-bar {
       position: fixed;
-      bottom: 0; left: var(--panel-w); right: 0;
-      height: 22px;
-      background: rgba(255,255,255,.9);
-      border-top: 1px solid var(--panel-border);
+      left: var(--panel-w);
+      right: 0;
+      bottom: 0;
+      min-height: 28px;
+      z-index: 350;
       display: flex;
       align-items: center;
-      padding: 0 10px;
-      gap: 12px;
-      z-index: 300;
-      font-size: 10px;
-      color: var(--text-3);
-      transition: left .25s ease;
+      gap: 10px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--ink-700);
+      background: rgba(255,255,255,.9);
+      border-top: 1px solid var(--divider);
+      backdrop-filter: blur(8px);
+      transition: left .24s ease;
     }
     #bottom-bar.expanded { left: 0; }
     #coords-display {
-      font-family: 'Source Code Pro', monospace;
-      font-size: 10px;
-      color: var(--text-3);
-      min-width: 200px;
+      font-family: "Source Code Pro", monospace;
+      font-size: 11px;
+      color: var(--ink-700);
+      min-width: 210px;
     }
-    .bb-sep { color: var(--divider); }
-    .bb-link { color: var(--text-4); text-decoration: none; }
-    .bb-link:hover { color: var(--brand); }
+    .bb-sep { color: #c3cdd6; }
+    .bb-link { color: var(--ink-600); text-decoration: none; }
+    .bb-link:hover { color: var(--brand-dark); }
 
-    /* ── Tile loading ────────────────────────────── */
-    #tile-toast {
+    #tile-toast, #app-toast {
       position: fixed;
-      bottom: 30px;
-      right: 50px;
-      background: var(--header-bg);
-      color: white;
-      padding: 7px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      font-weight: 500;
-      z-index: 900;
-      pointer-events: none;
-      display: flex; align-items: center; gap: 8px;
+      right: 18px;
+      bottom: 42px;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-radius: 14px;
       box-shadow: var(--shadow-lg);
+      background: #18232d;
+      color: white;
+      font-size: 12px;
       opacity: 0;
-      transform: translateY(8px);
-      transition: opacity .2s, transform .2s;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: .18s ease;
     }
-    #tile-toast.on { opacity: 1; transform: translateY(0); }
-    .t-spin {
-      width: 11px; height: 11px;
-      border: 2px solid rgba(255,255,255,.3);
+    #app-toast { bottom: 94px; }
+    #tile-toast.on, #app-toast.on { opacity: 1; transform: translateY(0); }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,.28);
       border-top-color: white;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
+      border-radius: 999px;
+      animation: spin .8s linear infinite;
+      flex: 0 0 auto;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Custom marker ───────────────────────────── */
-    .marker-loading {
-      width: 26px; height: 26px;
-      border: 3px solid rgba(0,121,193,.5);
-      border-top-color: var(--brand);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-    }
-
-    /* ── Leaflet popup overrides ─────────────────── */
     .leaflet-popup-content-wrapper {
-      border-radius: var(--radius-sm) !important;
+      border-radius: 16px !important;
       box-shadow: var(--shadow-lg) !important;
       padding: 0 !important;
       overflow: hidden;
-      border: 1px solid var(--panel-border) !important;
-      min-width: 230px;
+      border: 1px solid var(--divider) !important;
     }
-    .leaflet-popup-content {
-      margin: 0 !important;
-      font-family: 'Source Sans 3', sans-serif !important;
-    }
+    .leaflet-popup-content { margin: 0 !important; font-family: Inter, sans-serif !important; }
     .leaflet-popup-tip { display: none; }
     .leaflet-popup-close-button {
       color: white !important;
+      right: 10px !important;
+      top: 8px !important;
       font-size: 18px !important;
-      top: 6px !important;
-      right: 8px !important;
-      font-weight: 300 !important;
     }
-    .pop-hdr {
-      padding: 10px 30px 10px 12px;
+    .popup-head {
+      padding: 12px 34px 12px 14px;
       color: white;
     }
-    .pop-hdr-title { font-size: 13px; font-weight: 700; }
-    .pop-hdr-sub   { font-size: 11px; opacity: .75; margin-top: 1px; font-family: 'Source Code Pro', monospace; }
-    .pop-body { padding: 10px 12px 12px; background: var(--surface); }
-    .pop-band {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 10px;
-      border-radius: var(--radius-xs);
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      border: 1px solid;
-    }
-    .pop-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .pop-score-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .pop-score-lbl { font-size: 11px; color: var(--text-3); }
-    .pop-score-val { font-family: 'Source Code Pro', monospace; font-size: 11px; color: var(--text-2); }
-    .pop-track { height: 4px; background: #e8e8e8; border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
-    .pop-fill  { height: 100%; border-radius: 2px; }
-    .pop-advisory {
-      font-size: 11.5px;
-      line-height: 1.55;
+    .popup-title { font-size: 13px; font-weight: 800; }
+    .popup-sub { font-size: 11px; opacity: .82; margin-top: 3px; font-family: "Source Code Pro", monospace; }
+    .popup-body { padding: 12px 14px 14px; background: white; }
+    .popup-band {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       padding: 8px 10px;
-      border-radius: var(--radius-xs);
-      border-left: 3px solid;
-    }
-    .pop-outside {
-      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid transparent;
       font-size: 12px;
-      color: #78350f;
-      line-height: 1.5;
-      background: var(--surface);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .popup-text {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--ink-700);
     }
 
-    /* ── Button spinner ──────────────────────────── */
-    .btn-spin {
-      display: none;
-      width: 12px; height: 12px;
-      border: 2px solid rgba(255,255,255,.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
+    .leaflet-draw-toolbar { display: none !important; }
+    .leaflet-interactive.aoi-polygon {
+      filter: drop-shadow(0 2px 8px rgba(0,121,193,.18));
     }
-    .btn-spin.on { display: inline-block; }
 
-    /* ── Mobile ──────────────────────────────────── */
-    @media (max-width: 680px) {
+    @media (max-width: 860px) {
       :root { --panel-w: 100vw; }
       #panel {
-        top: auto; bottom: 0;
-        height: 50vh;
-        transform: translateY(calc(100% - 42px));
-        border-right: none;
-        border-top: 1px solid var(--panel-border);
-        border-radius: 8px 8px 0 0;
-        box-shadow: 0 -4px 20px rgba(0,0,0,.15);
+        width: 100vw;
+        top: auto;
+        bottom: 0;
+        height: 52vh;
+        border-right: 0;
+        border-top: 1px solid var(--divider);
+        border-radius: 20px 20px 0 0;
+        transform: translateY(calc(100% - 74px));
       }
       #panel.collapsed { transform: translateY(0); }
       #panel-tab { display: none; }
+      #toolbar { top: calc(var(--header-h) + 10px); right: 10px; }
       #bottom-bar { left: 0; }
-      #toolbar { top: auto; bottom: calc(50vh + 8px); right: 8px; }
-      .hdr-title, .hdr-tag { display: none; }
-      .mobile-handle {
-        display: flex;
-        justify-content: center;
-        padding: 8px 0 4px;
-        flex-shrink: 0;
-        cursor: pointer;
-      }
-      .mobile-handle-bar {
-        width: 32px; height: 3px;
-        background: var(--panel-border);
-        border-radius: 2px;
-      }
-    }
-    @media (min-width: 681px) {
-      .mobile-handle { display: none; }
+      .header-chip, .brand-sub { display: none; }
+      .mode-tabs { grid-template-columns: repeat(2, 1fr); }
+      .analysis-summary, .class-row, .grid-2, .tool-grid, .stats-list { grid-template-columns: 1fr; }
+      .class-row { gap: 6px; }
+      #coords-display { min-width: unset; }
     }
   </style>
 </head>
 <body>
-
-<!-- ── Header ── -->
-<div id="header">
-  <div class="hdr-product">
-    <div class="hdr-icon">🌊</div>
-    <span class="hdr-name">FloodMap KY</span>
-  </div>
-  <div class="hdr-divider"></div>
-  <span class="hdr-title">North Fork Kentucky River Watershed — Flood Susceptibility</span>
-  <div class="hdr-spacer"></div>
-  <span class="hdr-tag">Research</span>
-  <button class="hdr-btn" title="Share" onclick="copyLink()">🔗</button>
-  <button class="hdr-btn" id="hdr-panel-btn" title="Toggle panel" onclick="togglePanel()">☰</button>
-</div>
-
-<!-- ── Map ── -->
-<div id="map"></div>
-
-<!-- ── Panel ── -->
-<div id="panel">
-  <div class="mobile-handle" onclick="toggleMobilePanel()">
-    <div class="mobile-handle-bar"></div>
-  </div>
-
-  <!-- Panel header -->
-  <div class="panel-hdr">
-    <span class="panel-hdr-icon">🗂️</span>
-    <span class="panel-hdr-title">Contents</span>
-  </div>
-
-  <div class="panel-scroll">
-
-    <!-- Search -->
-    <div class="section">
-      <div class="section-hdr open" onclick="toggleSection(this)">
-        <span class="section-hdr-label">Find Location</span>
-        <span class="section-hdr-arrow">▼</span>
+  <div id="header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 15c1.3 0 1.3-1 2.7-1s1.3 1 2.7 1 1.3-1 2.6-1 1.4 1 2.8 1 1.3-1 2.7-1 1.4 1 2.8 1"/><path d="M4 10c1.3 0 1.3-1 2.7-1s1.3 1 2.7 1 1.3-1 2.6-1 1.4 1 2.8 1 1.3-1 2.7-1 1.4 1 2.8 1"/></svg>
       </div>
-      <div class="section-body">
-        <div style="position:relative">
-          <div class="search-bar">
-            <span class="search-bar-icon">🔍</span>
-            <input type="text" id="search-input" placeholder="Search address or place…" autocomplete="off"/>
-            <button id="search-clear" onclick="clearSearch()">✕</button>
-            <button id="search-btn" onclick="doSearch()">
-              <span id="btn-text">Search</span>
-              <span class="btn-spin" id="btn-spin"></span>
-            </button>
+      <div class="brand-text">
+        <div class="brand-name">Flood Susceptibility Explorer</div>
+        <div class="brand-sub">North Fork Kentucky River Basin · interactive decision-support viewer</div>
+      </div>
+    </div>
+    <div class="header-spacer"></div>
+    <div class="header-chip">Research prototype</div>
+    <button class="icon-btn" type="button" title="Share link" onclick="copyLink()" aria-label="Share link">
+      <svg viewBox="0 0 24 24"><path d="M10 14 14 10"/><path d="M7 17a3 3 0 0 1 0-4.24l2.12-2.12a3 3 0 1 1 4.24 4.24l-.7.7"/><path d="M17 7a3 3 0 0 1 0 4.24l-2.12 2.12a3 3 0 1 1-4.24-4.24l.7-.7"/></svg>
+    </button>
+    <button class="icon-btn" type="button" title="Toggle panel" onclick="togglePanel()" aria-label="Toggle panel">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+    </button>
+  </div>
+
+  <div id="map"></div>
+
+  <aside id="panel">
+    <div class="panel-top">
+      <div class="panel-kicker">Map workspace</div>
+      <h1 class="panel-title">Explore, query, and summarize susceptibility</h1>
+      <p class="panel-desc">Search a location, click the map, draw a polygon, sketch a freehand area, or upload a zipped watershed shapefile to summarize flood susceptibility by class.</p>
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-view="explore" type="button">Explore</button>
+        <button class="mode-tab" data-view="analyze" type="button">Analyze</button>
+        <button class="mode-tab" data-view="layers" type="button">Layers</button>
+        <button class="mode-tab" data-view="about" type="button">About</button>
+      </div>
+    </div>
+
+    <div class="panel-scroll">
+      <section class="panel-view active" id="view-explore">
+        <div class="block">
+          <div class="block-title"><h3>Find location</h3><span>point query</span></div>
+          <div class="search-shell">
+            <div class="search-wrap">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+              <input id="search-input" type="text" placeholder="Search address, place, or community" autocomplete="off" />
+              <button id="search-clear" type="button" onclick="clearSearch()" aria-label="Clear search">×</button>
+            </div>
+            <button class="primary-btn" id="search-btn" type="button" onclick="doSearch()">Search</button>
+            <div id="autocomplete" class="autocomplete"></div>
           </div>
-          <div id="autocomplete"></div>
-        </div>
-        <div class="error-chip" id="error-chip"></div>
-        <div style="height:8px"></div>
-        <div class="click-hint">
-          <span>ℹ️</span> Click anywhere on the map to query flood susceptibility.
-        </div>
-        <div style="height:8px"></div>
-        <!-- Result -->
-        <div class="result-card" id="result-card">
-          <div class="rc-top">
-            <div class="rc-dot" id="rc-dot"></div>
-            <div>
-              <div class="rc-loc" id="rc-loc">—</div>
-              <div class="rc-sub" id="rc-sub"></div>
+          <div class="hint-card">Click anywhere on the map to retrieve flood susceptibility for a single location. The point result is ideal for parcel-level review or spot checks during map exploration.</div>
+          <div id="search-status" class="status-card"></div>
+          <div class="result-card" id="result-card">
+            <div class="result-head">
+              <div class="result-dot" id="result-dot"></div>
+              <div>
+                <div class="result-loc" id="result-loc">—</div>
+                <div class="result-sub" id="result-sub">—</div>
+              </div>
+            </div>
+            <div class="risk-band" id="risk-band"><span id="risk-band-label">—</span></div>
+            <div class="metrics-row">
+              <div class="metric-card">
+                <div class="metric-label">Susceptibility score</div>
+                <div class="metric-value" id="result-score">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Class</div>
+                <div class="metric-value" id="result-class">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Latitude</div>
+                <div class="metric-value code" id="result-lat">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Longitude</div>
+                <div class="metric-value code" id="result-lon">—</div>
+              </div>
+            </div>
+            <div class="score-block">
+              <div class="score-row"><span>Relative flood susceptibility</span><strong id="result-score-2">—</strong></div>
+              <div class="track"><div class="fill" id="result-fill"></div></div>
+              <div class="score-ends"><span>Very low</span><span>Very high</span></div>
+            </div>
+            <div class="advisory" id="result-advisory"></div>
+            <div class="result-actions">
+              <button class="ghost-btn" type="button" onclick="zoomToActiveMarker()">Zoom to result</button>
+              <button class="ghost-btn" type="button" onclick="clearPointResult()">Clear result</button>
             </div>
           </div>
-          <div class="rc-band" id="rc-band">
-            <span id="rc-band-icon"></span>
-            <span id="rc-band-label"></span>
-          </div>
-          <div class="rc-score-row">
-            <span class="rc-score-lbl">Susceptibility Score</span>
-            <span class="rc-score-val" id="rc-score">—</span>
-          </div>
-          <div class="rc-track">
-            <div class="rc-fill" id="rc-fill" style="width:0%"></div>
-          </div>
-          <div class="rc-ends"><span>Very Low</span><span>Very High</span></div>
-          <div class="rc-advisory" id="rc-advisory"></div>
         </div>
-        <!-- Outside -->
-        <div class="outside-card" id="outside-card">
-          ⚠️ <strong>Outside Study Area</strong><br>
-          This location is outside the North Fork Kentucky River Watershed boundary.
-        </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- Layers -->
-    <div class="section">
-      <div class="section-hdr open" onclick="toggleSection(this)">
-        <span class="section-hdr-label">Layers</span>
-        <span class="section-hdr-arrow">▼</span>
-      </div>
-      <div class="section-body">
-        <div class="layer-row">
-          <button class="layer-vis-btn" id="flood-vis-btn" onclick="toggleFlood()" title="Toggle visibility">👁</button>
-          <span class="layer-name">Flood Susceptibility</span>
-        </div>
-        <div class="layer-opacity-wrap" style="margin-top:6px">
-          <span class="layer-opacity-lbl">Opacity</span>
-          <input type="range" id="opacity-slider" min="0" max="100" value="80"/>
-          <span class="layer-opacity-val" id="opacity-val">80%</span>
-        </div>
-      </div>
-    </div>
+      <section class="panel-view" id="view-analyze">
+        <div class="block">
+          <div class="block-title"><h3>Area analysis</h3><span>polygon summary</span></div>
+          <p class="muted">Use a drawn or uploaded polygon to summarize the total area in each of the five susceptibility classes. Area is reported in square kilometers.</p>
 
-    <!-- Legend -->
-    <div class="section">
-      <div class="section-hdr open" onclick="toggleSection(this)">
-        <span class="section-hdr-label">Legend</span>
-        <span class="section-hdr-arrow">▼</span>
-      </div>
-      <div class="section-body" style="padding: 6px 8px;">
-        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;padding-left:8px;">Flood Susceptibility Class</div>
-        <div class="legend-item">
-          <div class="legend-patch" style="background:#d7191c"></div>
-          <span class="legend-lbl">Very High</span>
-          <span class="legend-range">0.80–1.00</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-patch" style="background:#fdae61"></div>
-          <span class="legend-lbl">High</span>
-          <span class="legend-range">0.60–0.80</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-patch" style="background:#ffffbf"></div>
-          <span class="legend-lbl">Moderate</span>
-          <span class="legend-range">0.40–0.60</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-patch" style="background:#a6d96a"></div>
-          <span class="legend-lbl">Low</span>
-          <span class="legend-range">0.20–0.40</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-patch" style="background:#1a9641"></div>
-          <span class="legend-lbl">Very Low</span>
-          <span class="legend-range">0.00–0.20</span>
-        </div>
-      </div>
-    </div>
+          <div class="grid-2" style="margin-top:12px;">
+            <div>
+              <label class="input-label" for="resolution-ft">Raster resolution</label>
+              <input class="number-input" id="resolution-ft" type="number" step="0.01" min="0.01" value="16.4042" />
+            </div>
+            <div>
+              <label class="input-label" for="upload-zip">Upload watershed shapefile</label>
+              <input class="file-input" id="upload-zip" type="file" accept=".zip,.geojson,.json" />
+            </div>
+          </div>
 
-    <!-- Basemap gallery -->
-    <div class="section">
-      <div class="section-hdr open" onclick="toggleSection(this)">
-        <span class="section-hdr-label">Basemap Gallery</span>
-        <span class="section-hdr-arrow">▼</span>
-      </div>
-      <div class="section-body">
-        <div class="bm-gallery">
-          <button class="bm-tile active" onclick="setBasemap('streets',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-streets">🗺️</div></div>
-            <div class="bm-label-strip">Streets</div>
-          </button>
-          <button class="bm-tile" onclick="setBasemap('satellite',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-satellite">🛰️</div></div>
-            <div class="bm-label-strip">Satellite</div>
-          </button>
-          <button class="bm-tile" onclick="setBasemap('hybrid',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-satellite" style="background:#1c2b1c">🌐</div></div>
-            <div class="bm-label-strip">Hybrid</div>
-          </button>
-          <button class="bm-tile" onclick="setBasemap('topo',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-topo">⛰️</div></div>
-            <div class="bm-label-strip">Topographic</div>
-          </button>
-          <button class="bm-tile" onclick="setBasemap('dark',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-dark">🌙</div></div>
-            <div class="bm-label-strip">Dark Gray</div>
-          </button>
-          <button class="bm-tile" onclick="setBasemap('light',this)">
-            <div class="bm-thumb"><div class="bm-thumb-inner bmt-light">☀️</div></div>
-            <div class="bm-label-strip">Light Gray</div>
-          </button>
-        </div>
-      </div>
-    </div>
+          <div class="tool-grid">
+            <button class="tool-action" id="draw-poly-btn" type="button" onclick="startPolygonDraw()">
+              Draw polygon
+              <small>Precise click-by-click boundary</small>
+            </button>
+            <button class="tool-action" id="freehand-btn" type="button" onclick="toggleFreehandMode()">
+              Freehand sketch
+              <small>Quick drag-based selection</small>
+            </button>
+            <button class="tool-action" type="button" onclick="analyzeCurrentAOI()">
+              Run analysis
+              <small>Summarize current boundary</small>
+            </button>
+            <button class="tool-action" type="button" onclick="clearAOI()">
+              Clear AOI
+              <small>Remove drawn or uploaded geometry</small>
+            </button>
+          </div>
 
-    <!-- Area overview -->
-    <div class="section">
-      <div class="section-hdr open" onclick="toggleSection(this)">
-        <span class="section-hdr-label">Study Area Overview</span>
-        <span class="section-hdr-arrow">▼</span>
-      </div>
-      <div class="section-body">
-        <div class="stats-row">
-          <div class="stat-tile">
-            <div class="stat-val">5 ft</div>
-            <div class="stat-lbl">Resolution</div>
+          <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. The code assumes the TiTiler statistics endpoint is available for GeoJSON polygon summaries.</div>
+          <div id="analysis-status" class="status-card"></div>
+
+          <div class="aoi-meta">
+            <div class="small-stat">
+              <div class="label">Current AOI</div>
+              <div class="value" id="aoi-source">None</div>
+            </div>
+            <div class="small-stat">
+              <div class="label">Geometry area</div>
+              <div class="value" id="aoi-geom-area">—</div>
+            </div>
+            <div class="small-stat">
+              <div class="label">Feature count</div>
+              <div class="value" id="aoi-feature-count">0</div>
+            </div>
+            <div class="small-stat">
+              <div class="label">Analysis status</div>
+              <div class="value" id="aoi-status-text">Waiting</div>
+            </div>
           </div>
-          <div class="stat-tile">
-            <div class="stat-val">5</div>
-            <div class="stat-lbl">Risk Classes</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-val">Eastern KY</div>
-            <div class="stat-lbl">Region</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-val" style="font-size:12px">CNN+XGB</div>
-            <div class="stat-lbl">ML Model</div>
+
+          <div class="analysis-card" id="analysis-card">
+            <div class="analysis-head">
+              <div>
+                <h4>Area by susceptibility class</h4>
+                <span id="analysis-source-label">Current selection</span>
+              </div>
+            </div>
+            <div class="analysis-summary">
+              <div class="summary-box">
+                <div class="lbl">Total classified area</div>
+                <div class="val" id="analysis-total-area">—</div>
+              </div>
+              <div class="summary-box">
+                <div class="lbl">Dominant class</div>
+                <div class="val" id="analysis-dominant">—</div>
+              </div>
+              <div class="summary-box">
+                <div class="lbl">Cell size used</div>
+                <div class="val" id="analysis-resolution">—</div>
+              </div>
+            </div>
+            <div class="class-table" id="class-table"></div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- About -->
-    <div class="section">
-      <div class="section-hdr" onclick="toggleSection(this)">
-        <span class="section-hdr-label">About this Map</span>
-        <span class="section-hdr-arrow">▼</span>
-      </div>
-      <div class="section-body hidden" style="font-size:12px;color:var(--text-2);line-height:1.8;">
-        <strong>Model:</strong> CNN + XGBoost ensemble<br>
-        <strong>Area:</strong> North Fork Kentucky River Watershed<br>
-        <strong>Source CRS:</strong> EPSG:3089 (KY State Plane)<br>
-        <strong>Tiles:</strong> TiTiler (auto-reprojected to EPSG:3857)<br>
-      </div>
-    </div>
+      <section class="panel-view" id="view-layers">
+        <div class="block">
+          <div class="block-title"><h3>Map layers</h3><span>display</span></div>
+          <div class="tool-grid" style="grid-template-columns:1fr;">
+            <button class="tool-action" id="flood-toggle-btn" type="button" onclick="toggleFloodLayer()">Flood susceptibility raster<small>Toggle visibility</small></button>
+          </div>
+          <label class="input-label" for="opacity-slider">Raster opacity</label>
+          <input id="opacity-slider" type="range" min="0" max="100" value="80" style="width:100%; accent-color: var(--brand);" />
+          <div class="muted" style="margin-top:8px;">Opacity: <strong id="opacity-value">80%</strong></div>
+        </div>
 
+        <div class="block">
+          <div class="block-title"><h3>Basemap</h3><span>context</span></div>
+          <div class="tool-grid">
+            <button class="tool-action active bm-btn" data-key="streets" type="button" onclick="setBasemap('streets', this)">Streets<small>Reference and labels</small></button>
+            <button class="tool-action bm-btn" data-key="satellite" type="button" onclick="setBasemap('satellite', this)">Imagery<small>High-resolution aerial context</small></button>
+            <button class="tool-action bm-btn" data-key="hybrid" type="button" onclick="setBasemap('hybrid', this)">Hybrid<small>Imagery with labels</small></button>
+            <button class="tool-action bm-btn" data-key="topo" type="button" onclick="setBasemap('topo', this)">Topographic<small>Terrain-oriented background</small></button>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><h3>Legend</h3><span>classes</span></div>
+          <div class="legend-list">
+            <div class="legend-item"><span class="swatch" style="background:var(--vh)"></span><span class="name">Very High</span><span class="range">0.80–1.00</span></div>
+            <div class="legend-item"><span class="swatch" style="background:var(--hi)"></span><span class="name">High</span><span class="range">0.60–0.80</span></div>
+            <div class="legend-item"><span class="swatch" style="background:var(--mo)"></span><span class="name">Moderate</span><span class="range">0.40–0.60</span></div>
+            <div class="legend-item"><span class="swatch" style="background:var(--lo)"></span><span class="name">Low</span><span class="range">0.20–0.40</span></div>
+            <div class="legend-item"><span class="swatch" style="background:var(--vl)"></span><span class="name">Very Low</span><span class="range">0.00–0.20</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-view" id="view-about">
+        <div class="block">
+          <div class="block-title"><h3>Study area overview</h3><span>summary</span></div>
+          <div class="stats-list">
+            <div class="stats-tile"><div class="value" id="stat-resolution">16.40 ft</div><div class="label">Default cell size</div></div>
+            <div class="stats-tile"><div class="value">5</div><div class="label">Susceptibility classes</div></div>
+            <div class="stats-tile"><div class="value">NFKYRB</div><div class="label">Basin focus</div></div>
+            <div class="stats-tile"><div class="value">CNN + XGB</div><div class="label">Model family</div></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
+          <p class="muted">
+            Polygon analysis in this version is designed around TiTiler's geometry-based statistics workflow. If your deployment returns a slightly different statistics payload, only the histogram parsing function should need adjustment.
+          </p>
+          <p class="muted">
+            Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Update that value to the true cell size of your production raster before publishing.
+          </p>
+          <p class="muted">
+            Upload support accepts <strong>.zip shapefiles</strong> or GeoJSON. For shapefiles, package the .shp, .dbf, .shx, and .prj files together in one ZIP archive.
+          </p>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><h3>Sources</h3><span>links</span></div>
+          <p class="muted"><strong>Raster source:</strong> Hugging Face-hosted Cloud Optimized GeoTIFF</p>
+          <p class="muted"><strong>Tile and statistics service:</strong> TiTiler</p>
+          <p class="muted"><strong>Basemap sources:</strong> OpenStreetMap and Esri world services</p>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div id="panel-tab" onclick="togglePanel()" aria-label="Toggle panel">
+    <svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"></path></svg>
   </div>
-</div>
 
-<!-- Panel toggle tab -->
-<div id="panel-tab" onclick="togglePanel()">
-  <svg viewBox="0 0 10 10" class="arrow"><polyline points="7,2 3,5 7,8" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-</div>
+  <div id="toolbar">
+    <button class="map-tool" type="button" title="Zoom in" onclick="map.zoomIn()">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+    </button>
+    <button class="map-tool" type="button" title="Zoom out" onclick="map.zoomOut()">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14"></path></svg>
+    </button>
+    <button class="map-tool" type="button" title="Home view" onclick="resetView()">
+      <svg viewBox="0 0 24 24"><path d="m4 11 8-6 8 6"></path><path d="M7 10v9h10v-9"></path></svg>
+    </button>
+    <button class="map-tool" type="button" title="Fit basin extent" onclick="fitExtent()">
+      <svg viewBox="0 0 24 24"><path d="M8 4H4v4"></path><path d="M16 4h4v4"></path><path d="M20 16v4h-4"></path><path d="M8 20H4v-4"></path></svg>
+    </button>
+    <button class="map-tool" type="button" title="Clear all graphics" onclick="clearAOI(); clearPointResult();">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m6 6 1 14h10l1-14"></path></svg>
+    </button>
+  </div>
 
-<!-- Right toolbar -->
-<div id="toolbar">
-  <button class="tool-btn" title="Zoom in"  onclick="map.zoomIn()">+</button>
-  <button class="tool-btn" title="Zoom out" onclick="map.zoomOut()">−</button>
-  <button class="tool-btn" title="Reset view" onclick="resetView()">⌂</button>
-  <button class="tool-btn" title="Full extent" onclick="fitExtent()">⊞</button>
-</div>
+  <div id="bottom-bar">
+    <span id="coords-display">Lat: —  Lon: —</span>
+    <span class="bb-sep">|</span>
+    <span>© <a class="bb-link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a></span>
+    <span class="bb-sep">|</span>
+    <span>Tiles: <a class="bb-link" href="https://titiler.xyz" target="_blank" rel="noreferrer">TiTiler</a></span>
+    <span class="bb-sep">|</span>
+    <span>Raster: <a class="bb-link" href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map" target="_blank" rel="noreferrer">Hugging Face</a></span>
+  </div>
 
-<!-- Bottom bar -->
-<div id="bottom-bar">
-  <span id="coords-display">Lat: — &nbsp; Lon: —</span>
-  <span class="bb-sep">|</span>
-  <span>© <a class="bb-link" href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a></span>
-  <span class="bb-sep">|</span>
-  <span>Tiles: <a class="bb-link" href="https://titiler.xyz" target="_blank">TiTiler</a></span>
-  <span class="bb-sep">|</span>
-  <span>Data: <a class="bb-link" href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map" target="_blank">Hugging Face</a></span>
-</div>
+  <div id="tile-toast"><div class="spinner"></div><span>Loading raster tiles…</span></div>
+  <div id="app-toast"></div>
 
-<!-- Tile toast -->
-<div id="tile-toast">
-  <div class="t-spin"></div>
-  Loading tiles…
-</div>
+  <script>
+    const TITILER = "https://titiler.xyz";
+    const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
+    const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
+    const DEFAULT_VIEW = [37.2473, -83.1932];
+    const DEFAULT_ZOOM = 12;
 
-<script>
-// ── Config ──────────────────────────────────────────────────────
-const TITILER = "https://titiler.xyz";
-const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
-const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png`
-  + `?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
+    const RISK_CONFIG = {
+      "Very Low":  { color: getCSS("--vl"), head: "#15753a", bg: "#eef9f1", border: "#c7e8cf", text: "#1e5e2f", message: "This area shows very low modeled flood susceptibility relative to the rest of the mapped basin." },
+      "Low":       { color: getCSS("--lo"), head: "#5f9226", bg: "#f4faec", border: "#d7ebbe", text: "#496c1d", message: "This area shows low modeled flood susceptibility, though localized conditions can still matter during intense rainfall." },
+      "Moderate":  { color: getCSS("--mo"), head: "#b18908", bg: "#fff9e7", border: "#f0df9a", text: "#785b00", message: "This area shows moderate modeled flood susceptibility and deserves closer review during significant storm events." },
+      "High":      { color: getCSS("--hi"), head: "#d67525", bg: "#fff4eb", border: "#f4c69b", text: "#8c4b11", message: "This area shows high modeled flood susceptibility and should be treated as a priority review zone for planning and emergency awareness." },
+      "Very High": { color: getCSS("--vh"), head: "#bb2134", bg: "#fff0f2", border: "#efb8c0", text: "#8f2230", message: "This area shows very high modeled flood susceptibility relative to the mapped basin and warrants the greatest caution." }
+    };
 
-// ── Risk config ──────────────────────────────────────────────────
-const RISKS = {
-  'Very Low':  { icon:'✅', dot:'#1a9641', bar:'#1a9641', hdr:'#1a7a38', bg:'var(--vl-bg)', fg:'var(--vl-fg)', bd:'var(--vl-bd)',
-    msg:'This area is highly unlikely to experience flooding based on its terrain and land characteristics. No special precautions needed under normal conditions.' },
-  'Low':       { icon:'🟢', dot:'#6ab04c', bar:'#a6d96a', hdr:'#4a7c1f', bg:'var(--lo-bg)', fg:'var(--lo-fg)', bd:'var(--lo-bd)',
-    msg:'This area has low susceptibility to flooding. Under normal rainfall conditions, flooding is unlikely. Stay informed during periods of prolonged or heavy rainfall.' },
-  'Moderate':  { icon:'⚠️', dot:'#e6b800', bar:'#f4d03f', hdr:'#b08a00', bg:'var(--mo-bg)', fg:'var(--mo-fg)', bd:'var(--mo-bd)',
-    msg:'This area has moderate susceptibility to flooding. It may be affected under sustained heavy rainfall. Monitor local weather forecasts and nearby river gauge readings during storm events.' },
-  'High':      { icon:'🚨', dot:'#e07c00', bar:'#fdae61', hdr:'#c45f00', bg:'var(--hi-bg)', fg:'var(--hi-fg)', bd:'var(--hi-bd)',
-    msg:'This area is highly susceptible to flooding. During continuous heavy rainfall in your surrounding area, continuously monitor river gauge heights and local emergency alerts. Be prepared to take action if conditions escalate.' },
-  'Very High': { icon:'🆘', dot:'#d7191c', bar:'#d7191c', hdr:'#a31317', bg:'var(--vh-bg)', fg:'var(--vh-fg)', bd:'var(--vh-bd)',
-    msg:'This area is extremely susceptible to flooding. During continuous heavy rainfall in your surrounding area, continuously monitor river gauge heights and emergency alerts. Follow all official evacuation orders immediately and avoid this area during any significant rainfall event.' }
-};
-
-function classifyRisk(p) {
-  if (p < 0.2) return 'Very Low';
-  if (p < 0.4) return 'Low';
-  if (p < 0.6) return 'Moderate';
-  if (p < 0.8) return 'High';
-  return 'Very High';
-}
-function isNodata(v) { return v === null || v === undefined || v < -0.5; }
-
-// ── Map ──────────────────────────────────────────────────────────
-const map = L.map('map', {
-  center: [37.2473, -83.1932],
-  zoom: 12,
-  zoomControl: false,
-  attributionControl: false
-});
-
-// ── Basemaps ─────────────────────────────────────────────────────
-const BASEMAPS = {
-  streets:   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap contributors' }),
-  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'© Esri, Maxar' }),
-  hybrid:    L.layerGroup([
-               L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 }),
-               L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 })
-             ]),
-  topo:      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'© Esri, HERE, Garmin' }),
-  dark:      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'© OpenStreetMap, © CARTO' }),
-  light:     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'© OpenStreetMap, © CARTO' })
-};
-
-let activeBasemap = BASEMAPS.streets.addTo(map);
-let activeBasemapKey = 'streets';
-
-function setBasemap(key, btn) {
-  if (key === activeBasemapKey) return;
-  if (activeBasemap instanceof L.LayerGroup) map.removeLayer(activeBasemap);
-  else map.removeLayer(activeBasemap);
-  activeBasemap = BASEMAPS[key];
-  if (activeBasemap instanceof L.LayerGroup) activeBasemap.addTo(map);
-  else activeBasemap.addTo(map);
-  activeBasemapKey = key;
-  floodLayer.bringToFront();
-  document.querySelectorAll('.bm-tile').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
-
-// ── Flood layer ──────────────────────────────────────────────────
-const tileToast = document.getElementById('tile-toast');
-const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8 });
-floodLayer.on('loading', () => tileToast.classList.add('on'));
-floodLayer.on('load',    () => tileToast.classList.remove('on'));
-floodLayer.addTo(map);
-
-// Fit to COG extent on load
-fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
-  .then(r => r.json())
-  .then(info => {
-    if (info.bounds) {
-      const b = info.bounds;
-      map.fitBounds([[b[1],b[0]],[b[3],b[2]]]);
+    function getCSS(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
-  }).catch(() => {});
-
-let floodOn = true;
-function toggleFlood() {
-  const btn = document.getElementById('flood-vis-btn');
-  floodOn ? map.removeLayer(floodLayer) : (floodLayer.addTo(map), floodLayer.bringToFront());
-  floodOn = !floodOn;
-  btn.classList.toggle('off', !floodOn);
-}
-
-document.getElementById('opacity-slider').addEventListener('input', function() {
-  floodLayer.setOpacity(this.value / 100);
-  document.getElementById('opacity-val').textContent = this.value + '%';
-});
-
-// ── Coordinate display ───────────────────────────────────────────
-map.on('mousemove', e => {
-  document.getElementById('coords-display').textContent =
-    `Lat: ${e.latlng.lat.toFixed(5)}  Lon: ${e.latlng.lng.toFixed(5)}`;
-});
-
-// ── Panel toggle ─────────────────────────────────────────────────
-let panelOpen = true;
-function togglePanel() {
-  panelOpen = !panelOpen;
-  document.getElementById('panel').classList.toggle('collapsed', !panelOpen);
-  document.getElementById('bottom-bar').classList.toggle('expanded', !panelOpen);
-}
-
-// Mobile panel
-let mobileOpen = false;
-function toggleMobilePanel() {
-  mobileOpen = !mobileOpen;
-  document.getElementById('panel').classList.toggle('collapsed', !mobileOpen);
-}
-
-// ── Section accordion ────────────────────────────────────────────
-function toggleSection(hdr) {
-  hdr.classList.toggle('open');
-  const body = hdr.nextElementSibling;
-  body.classList.toggle('hidden');
-}
-
-// ── Helpers ──────────────────────────────────────────────────────
-function resetView() { map.setView([37.2473, -83.1932], 12); }
-function fitExtent() {
-  fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
-    .then(r => r.json()).then(info => {
-      if (info.bounds) { const b=info.bounds; map.fitBounds([[b[1],b[0]],[b[3],b[2]]]); }
-    }).catch(() => {});
-}
-function copyLink() {
-  navigator.clipboard?.writeText(location.href).then(() => alert('Link copied!')).catch(() => {});
-}
-
-// ── Marker ───────────────────────────────────────────────────────
-function makeMarker(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34">
-    <path d="M13 1C6.9 1 2 5.9 2 12c0 8.5 11 21 11 21s11-12.5 11-21C24 5.9 19.1 1 13 1z"
-      fill="${color}" stroke="white" stroke-width="1.5"/>
-    <circle cx="13" cy="12" r="4.5" fill="white" opacity=".9"/>
-  </svg>`;
-  return L.divIcon({ html: svg, className:'', iconSize:[26,34], iconAnchor:[13,34], popupAnchor:[0,-36] });
-}
-const loadingMarkerIcon = L.divIcon({
-  html: '<div class="marker-loading"></div>',
-  className:'', iconSize:[26,26], iconAnchor:[13,13]
-});
-
-let activeMarker = null;
-
-// ── Popup builders ───────────────────────────────────────────────
-function buildPopup(title, sub, prob, label) {
-  const r = RISKS[label];
-  return `
-    <div class="pop-hdr" style="background:${r.hdr}">
-      <div class="pop-hdr-title">${title}</div>
-      <div class="pop-hdr-sub">${sub}</div>
-    </div>
-    <div class="pop-body">
-      <div class="pop-band" style="background:${r.bg};color:${r.fg};border-color:${r.bd}">
-        <div class="pop-dot" style="background:${r.dot}"></div>${r.icon} ${label} Susceptibility
-      </div>
-      <div class="pop-score-row">
-        <span class="pop-score-lbl">Susceptibility Score</span>
-        <span class="pop-score-val">${(prob*100).toFixed(1)}%</span>
-      </div>
-      <div class="pop-track"><div class="pop-fill" style="width:${(prob*100).toFixed(1)}%;background:${r.dot}"></div></div>
-      <div class="pop-advisory" style="background:${r.bg};border-color:${r.dot};color:${r.fg}">${r.msg}</div>
-    </div>`;
-}
-
-function buildOutsidePopup(title) {
-  return `
-    <div class="pop-hdr" style="background:#78350f">
-      <div class="pop-hdr-title">${title}</div>
-      <div class="pop-hdr-sub">Outside study area</div>
-    </div>
-    <div class="pop-outside">⚠️ This location falls outside the North Fork Kentucky River Watershed boundary.</div>`;
-}
-
-// ── Sidebar update ───────────────────────────────────────────────
-function updateSidebar(loc, sub, prob, label) {
-  const r = RISKS[label];
-  document.getElementById('rc-dot').style.background = r.dot;
-  document.getElementById('rc-loc').textContent  = loc;
-  document.getElementById('rc-sub').textContent  = sub;
-  document.getElementById('rc-band').style.cssText =
-    `background:${r.bg};color:${r.fg};border-color:${r.bd}`;
-  document.getElementById('rc-band-icon').textContent  = r.icon;
-  document.getElementById('rc-band-label').textContent = `${label} Susceptibility`;
-  document.getElementById('rc-score').textContent      = `${(prob*100).toFixed(1)}%`;
-  const fill = document.getElementById('rc-fill');
-  fill.style.background = r.dot;
-  fill.style.width = `${prob*100}%`;
-  const adv = document.getElementById('rc-advisory');
-  adv.style.cssText = `background:${r.bg};border-color:${r.dot};color:${r.fg}`;
-  adv.textContent   = r.msg;
-  document.getElementById('result-card').classList.add('on');
-  document.getElementById('outside-card').classList.remove('on');
-  document.getElementById('error-chip').classList.remove('on');
-}
-
-// ── Query ────────────────────────────────────────────────────────
-async function queryPoint(lon, lat) {
-  const res  = await fetch(`${TITILER}/cog/point/${lon},${lat}?url=${encodeURIComponent(COG_URL)}`);
-  if (!res.ok) throw new Error(`${res.status}`);
-  const d = await res.json();
-  if (Array.isArray(d.values) && d.values.length) return d.values[0];
-  if (d.value != null) return d.value;
-  const k = Object.keys(d); if (k.length) return d[k[0]];
-  return null;
-}
-
-// ── Map click ────────────────────────────────────────────────────
-map.on('click', async e => {
-  const { lat, lng } = e.latlng;
-  if (activeMarker) map.removeLayer(activeMarker);
-  activeMarker = L.marker([lat, lng], { icon: loadingMarkerIcon }).addTo(map);
-
-  try {
-    const raw   = await queryPoint(lng, lat);
-    const coord = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const sub   = `${Math.abs(lat).toFixed(4)}°${lat>=0?'N':'S'}, ${Math.abs(lng).toFixed(4)}°${lng>=0?'E':'W'}`;
-
-    if (isNodata(raw)) {
-      activeMarker.setIcon(makeMarker('#9e9e9e'));
-      activeMarker.bindPopup(buildOutsidePopup('Clicked Location')).openPopup();
-      document.getElementById('outside-card').classList.add('on');
-      document.getElementById('result-card').classList.remove('on');
-      return;
+    function classifyRisk(value) {
+      if (value < 0.2) return "Very Low";
+      if (value < 0.4) return "Low";
+      if (value < 0.6) return "Moderate";
+      if (value < 0.8) return "High";
+      return "Very High";
+    }
+    function isNodata(v) {
+      return v === null || v === undefined || Number.isNaN(v) || v < -0.5;
+    }
+    function fmtNum(value, digits = 2) {
+      return Number(value).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    }
+    function km2FromSqMeters(area) {
+      return area / 1e6;
+    }
+    function pixelAreaSqKmFromFeet(cellFt) {
+      const meters = cellFt * 0.3048;
+      return (meters * meters) / 1e6;
+    }
+    function setStatus(id, message = "", type = "warn") {
+      const el = document.getElementById(id);
+      if (!message) {
+        el.className = "status-card";
+        el.textContent = "";
+        return;
+      }
+      el.className = `status-card on${type === "error" ? " error" : ""}`;
+      el.textContent = message;
+    }
+    let toastTimer = null;
+    function showToast(message, mode = "dark") {
+      const el = document.getElementById("app-toast");
+      el.innerHTML = `<span>${message}</span>`;
+      el.style.background = mode === "error" ? "#8f2230" : (mode === "success" ? "#15753a" : "#18232d");
+      el.classList.add("on");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove("on"), 2200);
     }
 
-    const prob  = Math.min(Math.max(raw, 0), 1);
-    const label = classifyRisk(prob);
-    activeMarker.setIcon(makeMarker(RISKS[label].dot));
-    activeMarker.bindPopup(buildPopup('Clicked Location', sub, prob, label)).openPopup();
-    updateSidebar('Clicked Location', sub, prob, label);
+    const map = L.map("map", {
+      center: DEFAULT_VIEW,
+      zoom: DEFAULT_ZOOM,
+      zoomControl: false,
+      attributionControl: false,
+      preferCanvas: true
+    });
 
-  } catch(err) {
-    activeMarker.setIcon(makeMarker('#9e9e9e'));
-    activeMarker.bindPopup('<div class="pop-outside">⚠️ Could not retrieve data. Try again.</div>').openPopup();
-  }
-});
+    const BASEMAPS = {
+      streets:   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }),
+      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "© Esri, Maxar" }),
+      hybrid:    L.layerGroup([
+                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }),
+                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })
+                  ]),
+      topo:      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "© Esri, HERE, Garmin" })
+    };
 
-// ── Autocomplete ─────────────────────────────────────────────────
-let acTimer = null;
-const acBox  = document.getElementById('autocomplete');
+    let activeBasemapKey = "streets";
+    let activeBasemap = BASEMAPS.streets.addTo(map);
 
-document.getElementById('search-input').addEventListener('input', function() {
-  const v = this.value.trim();
-  document.getElementById('search-clear').style.display = v ? 'block' : 'none';
-  clearTimeout(acTimer);
-  if (v.length < 3) { acBox.style.display='none'; return; }
-  acTimer = setTimeout(() => fetchAC(v), 350);
-});
-
-document.getElementById('search-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter')  { acBox.style.display='none'; doSearch(); }
-  if (e.key === 'Escape') acBox.style.display='none';
-});
-
-document.addEventListener('click', e => {
-  if (!e.target.closest('#search-input') && !e.target.closest('#autocomplete'))
-    acBox.style.display = 'none';
-});
-
-function clearSearch() {
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-clear').style.display = 'none';
-  acBox.style.display = 'none';
-}
-
-async function fetchAC(q) {
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`,
-      { headers: { 'Accept-Language':'en' } }
-    );
-    const d = await r.json();
-    if (!d.length) { acBox.style.display='none'; return; }
-    acBox.innerHTML = d.map(x => {
-      const nm  = x.display_name.split(',')[0];
-      const sb  = x.display_name.split(',').slice(1,3).join(',').trim();
-      return `<div class="ac-item" onclick="selectAC(${x.lat},${x.lon},'${x.display_name.replace(/'/g,"\\'")}')">
-        <span class="ac-icon">📍</span>
-        <div><div class="ac-name">${nm}</div><div class="ac-sub">${sb}</div></div>
-      </div>`;
-    }).join('');
-    acBox.style.display = 'block';
-  } catch(e) { acBox.style.display='none'; }
-}
-
-async function selectAC(lat, lon, dn) {
-  document.getElementById('search-input').value = dn.split(',')[0];
-  acBox.style.display = 'none';
-  await runQuery(parseFloat(lat), parseFloat(lon), dn);
-}
-
-async function doSearch() {
-  const q = document.getElementById('search-input').value.trim();
-  if (!q) return;
-  acBox.style.display = 'none';
-  const btn = document.getElementById('search-btn');
-  const sp  = document.getElementById('btn-spin');
-  const bt  = document.getElementById('btn-text');
-  btn.disabled=true; sp.classList.add('on'); bt.textContent='';
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-      { headers: { 'Accept-Language':'en' } }
-    );
-    const d = await r.json();
-    if (!d.length) { showError('Location not found. Try a more specific address.'); return; }
-    await runQuery(parseFloat(d[0].lat), parseFloat(d[0].lon), d[0].display_name);
-  } catch(e) {
-    showError('Search failed. Please check your connection.');
-  } finally {
-    btn.disabled=false; sp.classList.remove('on'); bt.textContent='Search';
-  }
-}
-
-async function runQuery(lat, lon, dn) {
-  if (activeMarker) map.removeLayer(activeMarker);
-  activeMarker = L.marker([lat,lon], { icon: loadingMarkerIcon }).addTo(map);
-  map.setView([lat, lon], 14);
-  const name  = dn.split(',')[0];
-  const sub   = dn.split(',').slice(1,3).join(',').trim();
-  const short = dn.split(',').slice(0,2).join(',');
-  try {
-    const raw = await queryPoint(lon, lat);
-    if (isNodata(raw)) {
-      activeMarker.setIcon(makeMarker('#9e9e9e'));
-      activeMarker.bindPopup(buildOutsidePopup(name)).openPopup();
-      document.getElementById('outside-card').classList.add('on');
-      document.getElementById('result-card').classList.remove('on');
-      return;
+    function setBasemap(key, btn) {
+      if (key === activeBasemapKey) return;
+      map.removeLayer(activeBasemap);
+      activeBasemap = BASEMAPS[key];
+      activeBasemap.addTo(map);
+      activeBasemapKey = key;
+      if (map.hasLayer(floodLayer)) floodLayer.bringToFront();
+      if (map.hasLayer(aoiLayer)) aoiLayer.bringToFront();
+      if (activeMarker) activeMarker.bringToFront();
+      document.querySelectorAll(".bm-btn").forEach(el => el.classList.remove("active"));
+      if (btn) btn.classList.add("active");
     }
-    const prob  = Math.min(Math.max(raw, 0), 1);
-    const label = classifyRisk(prob);
-    activeMarker.setIcon(makeMarker(RISKS[label].dot));
-    activeMarker.bindPopup(buildPopup(name, sub, prob, label)).openPopup();
-    updateSidebar(name, short, prob, label);
-  } catch(err) {
-    activeMarker.setIcon(makeMarker('#9e9e9e'));
-    showError('Could not retrieve flood data for this location.');
-  }
-}
 
-function showError(msg) {
-  const el = document.getElementById('error-chip');
-  el.textContent = msg; el.classList.add('on');
-}
-</script>
+    const tileToast = document.getElementById("tile-toast");
+    const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8, crossOrigin: true });
+    floodLayer.on("loading", () => tileToast.classList.add("on"));
+    floodLayer.on("load", () => tileToast.classList.remove("on"));
+    floodLayer.addTo(map);
+
+    let cogBounds = null;
+    fetch(`${TITILER}/cog/info?url=${encodeURIComponent(COG_URL)}`)
+      .then(r => r.json())
+      .then(info => {
+        if (Array.isArray(info.bounds)) {
+          cogBounds = info.bounds;
+          map.fitBounds([[cogBounds[1], cogBounds[0]], [cogBounds[3], cogBounds[2]]]);
+        }
+      })
+      .catch(() => {
+        showToast("Could not read COG extent.", "error");
+      });
+
+    function resetView() {
+      map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+    }
+    function fitExtent() {
+      if (cogBounds) {
+        map.fitBounds([[cogBounds[1], cogBounds[0]], [cogBounds[3], cogBounds[2]]], { padding: [20, 20] });
+      } else {
+        resetView();
+      }
+    }
+
+    map.on("mousemove", e => {
+      document.getElementById("coords-display").textContent = `Lat: ${e.latlng.lat.toFixed(5)}  Lon: ${e.latlng.lng.toFixed(5)}`;
+      if (freehandMode && freehandDrawing) handleFreehandMove(e.latlng);
+    });
+
+    let panelOpen = true;
+    function togglePanel() {
+      panelOpen = !panelOpen;
+      document.getElementById("panel").classList.toggle("collapsed", !panelOpen);
+      document.getElementById("bottom-bar").classList.toggle("expanded", !panelOpen);
+    }
+
+    document.querySelectorAll(".mode-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".mode-tab").forEach(x => x.classList.remove("active"));
+        document.querySelectorAll(".panel-view").forEach(x => x.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`view-${btn.dataset.view}`).classList.add("active");
+      });
+    });
+
+    let floodVisible = true;
+    function toggleFloodLayer() {
+      floodVisible = !floodVisible;
+      if (floodVisible) {
+        floodLayer.addTo(map);
+        floodLayer.bringToFront();
+        if (map.hasLayer(aoiLayer)) aoiLayer.bringToFront();
+      } else {
+        map.removeLayer(floodLayer);
+      }
+      document.getElementById("flood-toggle-btn").classList.toggle("active", floodVisible);
+    }
+    document.getElementById("opacity-slider").addEventListener("input", e => {
+      const value = Number(e.target.value);
+      floodLayer.setOpacity(value / 100);
+      document.getElementById("opacity-value").textContent = `${value}%`;
+    });
+    document.getElementById("resolution-ft").addEventListener("input", e => {
+      document.getElementById("stat-resolution").textContent = `${fmtNum(e.target.value, 2)} ft`;
+    });
+
+    function makeMarker(color) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40"><path d="M15 2C8 2 2.5 7.5 2.5 14.4C2.5 24.4 15 38 15 38s12.5-13.6 12.5-23.6C27.5 7.5 22 2 15 2z" fill="${color}" stroke="white" stroke-width="1.8"/><circle cx="15" cy="14.5" r="5.1" fill="white" opacity=".92"/></svg>`;
+      return L.divIcon({ html: svg, className: "", iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -34] });
+    }
+    const loadingIcon = L.divIcon({ html: '<div class="spinner" style="width:24px;height:24px;border-color:rgba(0,121,193,.28);border-top-color:#0079c1"></div>', className: "", iconSize: [24, 24], iconAnchor: [12, 12] });
+    let activeMarker = null;
+
+    function buildPopup(title, sub, risk, prob) {
+      const cfg = RISK_CONFIG[risk];
+      return `
+        <div class="popup-head" style="background:${cfg.head}">
+          <div class="popup-title">${title}</div>
+          <div class="popup-sub">${sub}</div>
+        </div>
+        <div class="popup-body">
+          <div class="popup-band" style="background:${cfg.bg}; border-color:${cfg.border}; color:${cfg.text}">
+            <span class="swatch" style="background:${cfg.color}"></span>${risk} susceptibility
+          </div>
+          <div class="popup-text"><strong>Score:</strong> ${(prob * 100).toFixed(1)}%<br>${cfg.message}</div>
+        </div>`;
+    }
+
+    async function queryPoint(lon, lat) {
+      const res = await fetch(`${TITILER}/cog/point/${lon},${lat}?url=${encodeURIComponent(COG_URL)}`);
+      if (!res.ok) throw new Error(`Point query failed: ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data.values) && data.values.length) return data.values[0];
+      if (data.value != null) return data.value;
+      const firstKey = Object.keys(data)[0];
+      return firstKey ? data[firstKey] : null;
+    }
+
+    function updatePointCard({ name, sub, lat, lon, prob, label }) {
+      const cfg = RISK_CONFIG[label];
+      document.getElementById("result-dot").style.background = cfg.color;
+      document.getElementById("result-loc").textContent = name;
+      document.getElementById("result-sub").textContent = sub;
+      const riskBand = document.getElementById("risk-band");
+      riskBand.style.background = cfg.bg;
+      riskBand.style.borderColor = cfg.border;
+      riskBand.style.color = cfg.text;
+      document.getElementById("risk-band-label").textContent = `${label} susceptibility`;
+      document.getElementById("result-score").textContent = `${(prob * 100).toFixed(1)}%`;
+      document.getElementById("result-score-2").textContent = `${(prob * 100).toFixed(1)}%`;
+      document.getElementById("result-class").textContent = label;
+      document.getElementById("result-lat").textContent = lat.toFixed(5);
+      document.getElementById("result-lon").textContent = lon.toFixed(5);
+      document.getElementById("result-fill").style.background = cfg.color;
+      document.getElementById("result-fill").style.width = `${prob * 100}%`;
+      const adv = document.getElementById("result-advisory");
+      adv.style.background = cfg.bg;
+      adv.style.borderColor = cfg.color;
+      adv.style.color = cfg.text;
+      adv.textContent = cfg.message;
+      document.getElementById("result-card").classList.add("on");
+      setStatus("search-status", "");
+    }
+
+    function clearPointResult() {
+      document.getElementById("result-card").classList.remove("on");
+      setStatus("search-status", "");
+      if (activeMarker) {
+        map.removeLayer(activeMarker);
+        activeMarker = null;
+      }
+    }
+    function zoomToActiveMarker() {
+      if (activeMarker) map.setView(activeMarker.getLatLng(), Math.max(map.getZoom(), 14));
+    }
+
+    async function runPointQuery(lat, lon, labelText, subtitleText) {
+      clearPointResult();
+      activeMarker = L.marker([lat, lon], { icon: loadingIcon }).addTo(map);
+      try {
+        const raw = await queryPoint(lon, lat);
+        if (isNodata(raw)) {
+          activeMarker.setIcon(makeMarker("#9aa9b5"));
+          activeMarker.bindPopup(`
+            <div class="popup-head" style="background:#5d6d79">
+              <div class="popup-title">${labelText}</div>
+              <div class="popup-sub">Outside mapped raster</div>
+            </div>
+            <div class="popup-body"><div class="popup-text">This location is outside the raster footprint or returns nodata.</div></div>
+          `).openPopup();
+          setStatus("search-status", "This location is outside the mapped flood susceptibility surface.");
+          return;
+        }
+        const prob = Math.max(0, Math.min(1, Number(raw)));
+        const risk = classifyRisk(prob);
+        activeMarker.setIcon(makeMarker(RISK_CONFIG[risk].color));
+        activeMarker.bindPopup(buildPopup(labelText, `${lat.toFixed(5)}, ${lon.toFixed(5)}`, risk, prob)).openPopup();
+        updatePointCard({ name: labelText, sub: subtitleText, lat, lon, prob, label: risk });
+      } catch (err) {
+        activeMarker.setIcon(makeMarker("#9aa9b5"));
+        setStatus("search-status", "Point query failed. Please try again.", "error");
+      }
+    }
+
+    map.on("click", async e => {
+      if (freehandMode || freehandDrawing) return;
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      await runPointQuery(lat, lon, "Clicked location", `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+    });
+
+    const acBox = document.getElementById("autocomplete");
+    let acTimer = null;
+    document.getElementById("search-input").addEventListener("input", e => {
+      const value = e.target.value.trim();
+      document.getElementById("search-clear").style.display = value ? "block" : "none";
+      clearTimeout(acTimer);
+      if (value.length < 3) {
+        acBox.style.display = "none";
+        return;
+      }
+      acTimer = setTimeout(() => fetchAutocomplete(value), 300);
+    });
+    document.getElementById("search-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") doSearch();
+      if (e.key === "Escape") acBox.style.display = "none";
+    });
+    document.addEventListener("click", e => {
+      if (!e.target.closest("#search-input") && !e.target.closest("#autocomplete")) acBox.style.display = "none";
+    });
+
+    function clearSearch() {
+      document.getElementById("search-input").value = "";
+      document.getElementById("search-clear").style.display = "none";
+      acBox.style.display = "none";
+      setStatus("search-status", "");
+    }
+
+    async function fetchAutocomplete(q) {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`, {
+          headers: { "Accept-Language": "en" }
+        });
+        const data = await r.json();
+        if (!Array.isArray(data) || !data.length) {
+          acBox.style.display = "none";
+          return;
+        }
+        acBox.innerHTML = data.map(item => {
+          const parts = item.display_name.split(",");
+          const title = parts[0]?.trim() || item.display_name;
+          const sub = parts.slice(1, 3).join(", ").trim();
+          return `<div class="ac-item" onclick="selectAutocomplete(${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "\\'")}')">
+            <div class="ac-title">${title}</div>
+            <div class="ac-sub">${sub}</div>
+          </div>`;
+        }).join("");
+        acBox.style.display = "block";
+      } catch (_) {
+        acBox.style.display = "none";
+      }
+    }
+
+    async function selectAutocomplete(lat, lon, displayName) {
+      document.getElementById("search-input").value = displayName.split(",")[0];
+      document.getElementById("search-clear").style.display = "block";
+      acBox.style.display = "none";
+      map.setView([Number(lat), Number(lon)], 14);
+      await runPointQuery(Number(lat), Number(lon), displayName.split(",")[0], displayName);
+    }
+
+    async function doSearch() {
+      const q = document.getElementById("search-input").value.trim();
+      if (!q) return;
+      acBox.style.display = "none";
+      const btn = document.getElementById("search-btn");
+      btn.disabled = true;
+      btn.textContent = "Searching…";
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
+          headers: { "Accept-Language": "en" }
+        });
+        const data = await r.json();
+        if (!Array.isArray(data) || !data.length) {
+          setStatus("search-status", "Location not found. Try a more specific query.", "error");
+          return;
+        }
+        const lat = Number(data[0].lat);
+        const lon = Number(data[0].lon);
+        map.setView([lat, lon], 14);
+        await runPointQuery(lat, lon, data[0].display_name.split(",")[0], data[0].display_name);
+      } catch (_) {
+        setStatus("search-status", "Search service is unavailable right now.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Search";
+      }
+    }
+
+    const aoiLayer = L.featureGroup().addTo(map);
+    let currentAOI = null;
+    let currentAOISource = "None";
+    let drawHandler = null;
+
+    function updateAOIMeta() {
+      document.getElementById("aoi-source").textContent = currentAOISource;
+      const count = currentAOI?.type === "FeatureCollection" ? currentAOI.features.length : (currentAOI ? 1 : 0);
+      document.getElementById("aoi-feature-count").textContent = String(count);
+      if (!currentAOI) {
+        document.getElementById("aoi-geom-area").textContent = "—";
+        document.getElementById("aoi-status-text").textContent = "Waiting";
+        return;
+      }
+      try {
+        const areaSqM = turf.area(currentAOI);
+        document.getElementById("aoi-geom-area").textContent = `${fmtNum(km2FromSqMeters(areaSqM), 2)} km²`;
+      } catch (_) {
+        document.getElementById("aoi-geom-area").textContent = "—";
+      }
+    }
+
+    function setAOI(geojson, sourceLabel) {
+      currentAOI = geojson;
+      currentAOISource = sourceLabel;
+      aoiLayer.clearLayers();
+      const layer = L.geoJSON(geojson, {
+        style: {
+          color: "#0079c1",
+          weight: 2,
+          fillColor: "#66b6ea",
+          fillOpacity: 0.18,
+          className: "aoi-polygon"
+        }
+      }).addTo(aoiLayer);
+      try {
+        map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+      } catch (_) {}
+      updateAOIMeta();
+      document.getElementById("aoi-status-text").textContent = "Ready";
+      showToast(`AOI loaded: ${sourceLabel}`, "success");
+    }
+
+    function clearAOI() {
+      stopFreehandMode();
+      aoiLayer.clearLayers();
+      currentAOI = null;
+      currentAOISource = "None";
+      updateAOIMeta();
+      setStatus("analysis-status", "");
+      document.getElementById("analysis-card").classList.remove("on");
+      document.getElementById("analysis-source-label").textContent = "Current selection";
+      document.getElementById("aoi-status-text").textContent = "Waiting";
+      document.getElementById("upload-zip").value = "";
+    }
+
+    function startPolygonDraw() {
+      stopFreehandMode();
+      if (drawHandler) drawHandler.disable();
+      drawHandler = new L.Draw.Polygon(map, {
+        showArea: true,
+        shapeOptions: {
+          color: "#0079c1",
+          weight: 2,
+          fillColor: "#66b6ea",
+          fillOpacity: 0.18
+        }
+      });
+      drawHandler.enable();
+      document.getElementById("draw-poly-btn").classList.add("active");
+      showToast("Click to draw a polygon.");
+    }
+
+    map.on(L.Draw.Event.CREATED, e => {
+      document.getElementById("draw-poly-btn").classList.remove("active");
+      const geojson = e.layer.toGeoJSON();
+      setAOI(geojson, "Drawn polygon");
+    });
+    map.on("draw:drawstop", () => {
+      document.getElementById("draw-poly-btn").classList.remove("active");
+    });
+
+    let freehandMode = false;
+    let freehandDrawing = false;
+    let freehandLatLngs = [];
+    let freehandLine = null;
+
+    function toggleFreehandMode() {
+      if (freehandMode) {
+        stopFreehandMode();
+        return;
+      }
+      if (drawHandler) drawHandler.disable();
+      freehandMode = true;
+      document.getElementById("freehand-btn").classList.add("active");
+      map.getContainer().style.cursor = "crosshair";
+      showToast("Press and drag on the map to sketch an area.");
+    }
+    function stopFreehandMode() {
+      freehandMode = false;
+      freehandDrawing = false;
+      freehandLatLngs = [];
+      if (freehandLine) {
+        map.removeLayer(freehandLine);
+        freehandLine = null;
+      }
+      document.getElementById("freehand-btn").classList.remove("active");
+      map.getContainer().style.cursor = "";
+      map.dragging.enable();
+    }
+    function handleFreehandMove(latlng) {
+      if (!freehandLine) {
+        freehandLine = L.polyline([], { color: "#0079c1", weight: 2, opacity: 0.9 }).addTo(map);
+      }
+      freehandLatLngs.push(latlng);
+      freehandLine.setLatLngs(freehandLatLngs);
+    }
+    map.on("mousedown", e => {
+      if (!freehandMode) return;
+      freehandDrawing = true;
+      freehandLatLngs = [e.latlng];
+      if (freehandLine) map.removeLayer(freehandLine);
+      freehandLine = L.polyline([e.latlng], { color: "#0079c1", weight: 2, opacity: 0.9 }).addTo(map);
+      map.dragging.disable();
+    });
+    map.on("mouseup", () => {
+      if (!freehandMode || !freehandDrawing) return;
+      freehandDrawing = false;
+      map.dragging.enable();
+      if (freehandLatLngs.length < 3) {
+        stopFreehandMode();
+        return;
+      }
+      const closed = [...freehandLatLngs, freehandLatLngs[0]];
+      const polygon = turf.polygon([[...closed.map(ll => [ll.lng, ll.lat])]]);
+      stopFreehandMode();
+      setAOI(polygon, "Freehand sketch");
+    });
+
+    document.getElementById("upload-zip").addEventListener("change", async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setStatus("analysis-status", "Reading uploaded boundary…");
+      try {
+        let geojson;
+        if (/\.zip$/i.test(file.name)) {
+          const buffer = await file.arrayBuffer();
+          geojson = await shp(buffer);
+        } else {
+          geojson = JSON.parse(await file.text());
+        }
+
+        if (!geojson || !["Feature", "FeatureCollection", "Polygon", "MultiPolygon"].includes(geojson.type)) {
+          throw new Error("Unsupported geometry type.");
+        }
+        if (geojson.type === "Polygon" || geojson.type === "MultiPolygon") geojson = { type: "Feature", properties: {}, geometry: geojson };
+        setAOI(geojson, file.name);
+        setStatus("analysis-status", "Boundary loaded. Run analysis when ready.");
+      } catch (err) {
+        setStatus("analysis-status", "Could not parse the uploaded file. Use a zipped shapefile or valid GeoJSON.", "error");
+      }
+    });
+
+    function extractStatsObject(payload) {
+      if (!payload || typeof payload !== "object") return null;
+      if (payload.b1) return payload.b1;
+      if (payload.statistics?.b1) return payload.statistics.b1;
+      if (payload.properties?.statistics?.b1) return payload.properties.statistics.b1;
+      for (const value of Object.values(payload)) {
+        if (value && typeof value === "object") {
+          const found = extractStatsObject(value);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function extractHistogram(stats) {
+      if (!stats) return null;
+      const h = stats.histogram;
+      if (Array.isArray(h) && h.length === 2 && Array.isArray(h[0]) && Array.isArray(h[1])) {
+        return { counts: h[0].map(Number), bins: h[1].map(Number) };
+      }
+      if (h && Array.isArray(h.counts) && Array.isArray(h.bins)) {
+        return { counts: h.counts.map(Number), bins: h.bins.map(Number) };
+      }
+      return null;
+    }
+
+    async function analyzeCurrentAOI() {
+      if (!currentAOI) {
+        setStatus("analysis-status", "Draw, sketch, or upload a polygon boundary first.", "error");
+        return;
+      }
+      const cellFt = Number(document.getElementById("resolution-ft").value);
+      if (!cellFt || cellFt <= 0) {
+        setStatus("analysis-status", "Enter a valid raster resolution in feet.", "error");
+        return;
+      }
+
+      setStatus("analysis-status", "Computing class areas for the selected boundary…");
+      document.getElementById("aoi-status-text").textContent = "Running";
+      try {
+        const url = `${TITILER}/cog/statistics?url=${encodeURIComponent(COG_URL)}&histogram_bins=5&histogram_range=0,1`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentAOI)
+        });
+        if (!res.ok) throw new Error(`Statistics endpoint error: ${res.status}`);
+        const payload = await res.json();
+        const stats = extractStatsObject(payload);
+        const histogram = extractHistogram(stats);
+        if (!histogram) throw new Error("Histogram not found in statistics response.");
+
+        const counts = histogram.counts.slice(0, 5);
+        const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
+        const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
+          name,
+          count: Number(counts[i] || 0),
+          area: Number(counts[i] || 0) * pixelAreaSqKm,
+          color: RISK_CONFIG[name].color
+        }));
+        const totalArea = classes.reduce((sum, item) => sum + item.area, 0);
+        const dominant = classes.slice().sort((a, b) => b.area - a.area)[0];
+
+        renderAnalysis(classes, totalArea, dominant?.name || "—", cellFt);
+        setStatus("analysis-status", "Analysis complete.");
+        document.getElementById("aoi-status-text").textContent = "Complete";
+        showToast("Area analysis complete.", "success");
+      } catch (err) {
+        console.error(err);
+        setStatus("analysis-status", "Area analysis failed. If your TiTiler deployment returns a different statistics payload, adjust the histogram parsing logic.", "error");
+        document.getElementById("aoi-status-text").textContent = "Failed";
+      }
+    }
+
+    function renderAnalysis(classes, totalArea, dominantClass, cellFt) {
+      document.getElementById("analysis-card").classList.add("on");
+      document.getElementById("analysis-source-label").textContent = currentAOISource;
+      document.getElementById("analysis-total-area").textContent = `${fmtNum(totalArea, 2)} km²`;
+      document.getElementById("analysis-dominant").textContent = dominantClass;
+      document.getElementById("analysis-resolution").textContent = `${fmtNum(cellFt, 2)} ft`;
+
+      const html = classes.map(item => {
+        const share = totalArea > 0 ? (item.area / totalArea) * 100 : 0;
+        return `
+          <div class="class-row">
+            <div class="class-name"><span class="swatch" style="background:${item.color}"></span>${item.name}</div>
+            <div class="bar-wrap"><div class="bar" style="width:${share}%; background:${item.color}"></div></div>
+            <div class="class-area">${fmtNum(item.area, 2)} km²</div>
+            <div class="class-share">${fmtNum(share, 1)}%</div>
+          </div>`;
+      }).join("");
+
+      document.getElementById("class-table").innerHTML = html;
+    }
+
+    async function copyLink() {
+      try {
+        await navigator.clipboard.writeText(location.href);
+        showToast("Link copied.", "success");
+      } catch (_) {
+        showToast("Could not copy the link.", "error");
+      }
+    }
+  </script>
 </body>
 </html>
