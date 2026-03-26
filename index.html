@@ -1942,7 +1942,7 @@
       return undefined;
     }
 
-    async function getAOIPixelValues(aoiGeoJSON) {
+    async function summarizeAOIPixels(aoiGeoJSON, edges) {
       const featureCollection = normalizeAOIForStats(aoiGeoJSON);
       const feature = featureCollection?.features?.[0] || null;
       const geometry = feature?.geometry || null;
@@ -1969,7 +1969,6 @@
       const candidates = getCandidateRasterProjections(raster);
       let chosen = null;
       let bbox = null;
-      let analysisGeometry = null;
       let analysisFeature = null;
       const tried = [];
 
@@ -1982,7 +1981,6 @@
           tried.push(`${candidate.epsg}:${bb.map(v => Number(v).toFixed(0)).join('/')}`);
           if (bb[2] > rxmin && bb[0] < rxmax && bb[3] > rymin && bb[1] < rymax) {
             chosen = candidate;
-            analysisGeometry = geom;
             analysisFeature = feat;
             bbox = bb;
             break;
@@ -2010,7 +2008,11 @@
       const xStep = (right - left) / width;
       const yStep = (top - bottom) / height;
       const nodata = raster.noDataValue;
-      const out = [];
+      const counts = new Array(edges.length - 1).fill(0);
+      let validCount = 0;
+      let minVal = Infinity;
+      let maxVal = -Infinity;
+      let sumVal = 0;
 
       for (let row = 0; row < height; row++) {
         const y = top - ((row + 0.5) * yStep);
@@ -2027,10 +2029,30 @@
             else if (value > 1 && value <= 255) value = value / 255;
           }
 
-          if (isUsableRasterValue(value)) out.push(value);
+          if (!isUsableRasterValue(value)) continue;
+          validCount += 1;
+          sumVal += value;
+          if (value < minVal) minVal = value;
+          if (value > maxVal) maxVal = value;
+          for (let i = 0; i < edges.length - 1; i++) {
+            const lower = edges[i];
+            const upper = edges[i + 1];
+            const isLast = i === edges.length - 2;
+            if ((value >= lower && value < upper) || (isLast && value >= lower && value <= upper)) {
+              counts[i] += 1;
+              break;
+            }
+          }
         }
       }
-      return out;
+
+      return {
+        counts,
+        validCount,
+        minVal: validCount ? minVal : null,
+        maxVal: validCount ? maxVal : null,
+        meanVal: validCount ? (sumVal / validCount) : null
+      };
     }
 
     function countValuesByProbabilityBins(values, edges) {
@@ -2083,14 +2105,14 @@
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
         await ensureAnalysisRaster();
-        const values = await getAOIPixelValues(aoi);
-        if (!values.length) {
+        const summary = await summarizeAOIPixels(aoi, edges);
+        if (!summary.validCount) {
           throw new Error("No valid raster pixels were found inside the selected area.");
         }
-        const counts = countValuesByProbabilityBins(values, edges);
-        const minVal = Math.min(...values);
-        const maxVal = Math.max(...values);
-        const meanVal = values.reduce((s, v) => s + v, 0) / values.length;
+        const counts = summary.counts;
+        const minVal = summary.minVal;
+        const maxVal = summary.maxVal;
+        const meanVal = summary.meanVal;
 
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
