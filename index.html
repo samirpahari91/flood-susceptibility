@@ -1851,9 +1851,39 @@
 
     function inferRasterProjection(raster) {
       const epsg = getRasterProjectionCode(raster);
-      if (epsg) return { epsg, source: 'metadata' };
+      if (epsg && (epsg !== 4326 || extentLooksGeographic(raster))) {
+        return { epsg, source: 'metadata' };
+      }
       if (extentLooksGeographic(raster)) return { epsg: 4326, source: 'extent' };
       return { epsg: null, source: 'unknown' };
+    }
+
+    function getCandidateRasterProjections(raster) {
+      const inferred = inferRasterProjection(raster);
+      const candidates = [];
+      const push = (epsg, source) => {
+        if (!epsg || candidates.some(c => c.epsg === epsg)) return;
+        candidates.push({ epsg, source });
+      };
+
+      push(inferred.epsg, inferred.source);
+
+      const xs = [Number(raster?.xmin), Number(raster?.xmax)];
+      const ys = [Number(raster?.ymin), Number(raster?.ymax)];
+      const looksProjectedFeet = xs.every(Number.isFinite) && ys.every(Number.isFinite)
+        && Math.max(...xs.map(Math.abs)) > 1000000
+        && Math.max(...ys.map(Math.abs)) > 1000000;
+
+      if (looksProjectedFeet) {
+        push(3091, 'kentucky_harn_ftus');
+        push(3089, 'kentucky_single_ftus');
+        push(6471, 'kentucky_north_2011_ftus');
+        push(2246, 'kentucky_north_ftus');
+      }
+
+      push(3857, 'webmercator');
+      push(4326, 'geographic_fallback');
+      return candidates;
     }
 
     async function ensureProjDefinition(epsg) {
@@ -1918,12 +1948,6 @@
         throw new Error("Raster reader does not support windowed value extraction.");
       }
 
-      const rasterEpsg = getRasterProjectionCode(raster) || 4326;
-      await ensureProjDefinition(rasterEpsg);
-      const analysisGeometry = rasterEpsg === 4326 ? geometry : reprojectGeometry(geometry, 4326, rasterEpsg);
-      const analysisFeature = turf.feature(analysisGeometry);
-
-      const bbox = turf.bbox(analysisFeature);
       const pixelWidth = Math.abs(Number(raster.pixelWidth || raster.resolution?.x || 0));
       const pixelHeight = Math.abs(Number(raster.pixelHeight || raster.resolution?.y || 0));
       if (!(pixelWidth > 0) || !(pixelHeight > 0)) {
@@ -1934,13 +1958,39 @@
       const rxmax = Math.max(raster.xmin, raster.xmax);
       const rymin = Math.min(raster.ymin, raster.ymax);
       const rymax = Math.max(raster.ymin, raster.ymax);
+
+      const candidates = getCandidateRasterProjections(raster);
+      let chosen = null;
+      let bbox = null;
+      let analysisGeometry = null;
+      let analysisFeature = null;
+      const tried = [];
+
+      for (const candidate of candidates) {
+        try {
+          await ensureProjDefinition(candidate.epsg);
+          const geom = candidate.epsg === 4326 ? geometry : reprojectGeometry(geometry, 4326, candidate.epsg);
+          const feat = turf.feature(geom);
+          const bb = turf.bbox(feat);
+          tried.push(`${candidate.epsg}:${bb.map(v => Number(v).toFixed(0)).join('/')}`);
+          if (bb[2] > rxmin && bb[0] < rxmax && bb[3] > rymin && bb[1] < rymax) {
+            chosen = candidate;
+            analysisGeometry = geom;
+            analysisFeature = feat;
+            bbox = bb;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (!chosen) {
+        throw new Error(`Selected area does not overlap the raster extent. AOI bbox: ${turf.bbox(turf.feature(geometry)).map(v => Number(v).toFixed(3)).join(', ')} | Raster extent: ${[rxmin, rymin, rxmax, rymax].map(v => Number(v).toFixed(3)).join(', ')} | Raster projection metadata: ${String(raster?.projection ?? 'unknown')} | Tried EPSG: ${tried.join(' ; ')}`);
+      }
+
       const left = clamp(bbox[0], rxmin, rxmax);
       const right = clamp(bbox[2], rxmin, rxmax);
       const bottom = clamp(bbox[1], rymin, rymax);
       const top = clamp(bbox[3], rymin, rymax);
-      if (!(right > left) || !(top > bottom)) {
-        throw new Error(`Selected area does not overlap the raster extent. AOI bbox: ${bbox.map(v => Number(v).toFixed(3)).join(', ')} | Raster extent: ${[rxmin, rymin, rxmax, rymax].map(v => Number(v).toFixed(3)).join(', ')} | Raster EPSG: ${rasterEpsg}`);
-      }
 
       const width = Math.max(1, Math.ceil((right - left) / pixelWidth));
       const height = Math.max(1, Math.ceil((top - bottom) / pixelHeight));
