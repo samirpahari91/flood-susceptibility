@@ -1150,7 +1150,7 @@
         <div class="block">
           <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
           <p class="muted">
-            Polygon analysis in this version runs in the browser against the COG itself. The first AOI run may take longer because the raster analysis engine is loaded client-side.
+            Polygon analysis in this version runs in the browser against the COG itself. The first AOI run may take longer because the raster values are read client-side before the class totals are summarized.
           </p>
           <p class="muted">
             Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Because your raster stores continuous probabilities from 0 to 1, the class totals are grouped using the probability breaks entered above.
@@ -1807,14 +1807,60 @@
       return analysisRasterPromise;
     }
 
-    function pickHistogramCounts(result) {
-      if (Array.isArray(result)) {
-        if (result.length && result[0] && Array.isArray(result[0].counts)) return result[0].counts.map(Number);
-        if (result.length && Array.isArray(result[0])) return result[0].map(Number);
+    function flattenDeep(input, out = []) {
+      if (Array.isArray(input)) {
+        for (const item of input) flattenDeep(item, out);
+      } else {
+        out.push(input);
       }
-      if (result && Array.isArray(result.counts)) return result.counts.map(Number);
-      if (result && result[0] && Array.isArray(result[0].counts)) return result[0].counts.map(Number);
-      return null;
+      return out;
+    }
+
+    function isUsableRasterValue(v) {
+      return Number.isFinite(v) && v >= 0 && v <= 1;
+    }
+
+    async function getAOIPixelValues(aoiGeoJSON) {
+      const featureCollection = normalizeAOIForStats(aoiGeoJSON);
+      const feature = featureCollection?.features?.[0] || null;
+      const geometry = feature?.geometry || null;
+      const candidates = [
+        featureCollection,
+        feature,
+        geometry,
+        featureCollection ? JSON.stringify(featureCollection) : null,
+        geometry ? JSON.stringify(geometry) : null
+      ].filter(Boolean);
+
+      let lastErr = null;
+      for (const candidate of candidates) {
+        try {
+          const result = await geoblaze.get(COG_URL, candidate, true);
+          const flat = flattenDeep(result).map(Number).filter(isUsableRasterValue);
+          if (flat.length) return flat;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      if (lastErr) throw lastErr;
+      return [];
+    }
+
+    function countValuesByProbabilityBins(values, edges) {
+      const counts = new Array(edges.length - 1).fill(0);
+      for (const value of values) {
+        if (!isUsableRasterValue(value)) continue;
+        for (let i = 0; i < edges.length - 1; i++) {
+          const lower = edges[i];
+          const upper = edges[i + 1];
+          const isLast = i === edges.length - 2;
+          if ((value >= lower && value < upper) || (isLast && value >= lower && value <= upper)) {
+            counts[i] += 1;
+            break;
+          }
+        }
+      }
+      return counts;
     }
 
     async function analyzeCurrentAOI() {
@@ -1849,16 +1895,12 @@
       setStatus("analysis-status", "Computing class areas for the selected boundary…");
       document.getElementById("aoi-status-text").textContent = "Running";
       try {
-        const raster = await ensureAnalysisRaster();
-        const histResult = await geoblaze.histogram(raster, geometry, {
-          scaleType: "ratio",
-          numClasses: 5,
-          classType: "equal-interval"
-        });
-        const counts = pickHistogramCounts(histResult);
-        if (!counts || counts.length < 5) {
-          throw new Error("Histogram could not be computed from the raster within the selected area.");
+        await ensureAnalysisRaster();
+        const values = await getAOIPixelValues(aoi);
+        if (!values.length) {
+          throw new Error("No valid raster pixels were found inside the selected area.");
         }
+        const counts = countValuesByProbabilityBins(values, edges);
 
         const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
           name,
