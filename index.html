@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/shpjs@6.1.0/dist/shp.min.js"></script>
   <script src="https://unpkg.com/georaster"></script>
   <script src="https://unpkg.com/geoblaze"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.min.js"></script>
   <style>
     :root {
       --brand: #0079c1;
@@ -1830,6 +1831,53 @@
       return Math.min(Math.max(value, min), max);
     }
 
+    function getRasterProjectionCode(raster) {
+      const p = raster?.projection;
+      if (p == null) return null;
+      const s = String(p).trim();
+      if (!s) return null;
+      const m = s.match(/(\d{4,6})/);
+      return m ? Number(m[1]) : null;
+    }
+
+    async function ensureProjDefinition(epsg) {
+      if (!epsg || epsg === 4326 || epsg === 3857) return;
+      const code = `EPSG:${epsg}`;
+      if (proj4.defs(code)) return;
+      const urls = [
+        `https://epsg.io/${epsg}.proj4`,
+        `https://epsg.io/?format=proj4&q=${epsg}`
+      ];
+      for (const url of urls) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const def = (await res.text()).trim();
+          if (def && def.includes('+proj')) {
+            proj4.defs(code, def);
+            return;
+          }
+        } catch (_) {}
+      }
+      throw new Error(`Projection EPSG:${epsg} could not be loaded for AOI analysis.`);
+    }
+
+    function transformCoordsDeep(coords, fn) {
+      if (!Array.isArray(coords)) return coords;
+      if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+        return fn(coords);
+      }
+      return coords.map(c => transformCoordsDeep(c, fn));
+    }
+
+    function reprojectGeometry(geometry, fromCode, toCode) {
+      if (!geometry || fromCode === toCode) return geometry;
+      const src = `EPSG:${fromCode}`;
+      const dst = `EPSG:${toCode}`;
+      const coords = transformCoordsDeep(geometry.coordinates, xy => proj4(src, dst, xy));
+      return { ...geometry, coordinates: coords };
+    }
+
     function getGridValue(grid, row, col) {
       if (grid == null) return undefined;
       if (Array.isArray(grid)) {
@@ -1854,19 +1902,28 @@
         throw new Error("Raster reader does not support windowed value extraction.");
       }
 
-      const bbox = turf.bbox(feature);
+      const rasterEpsg = getRasterProjectionCode(raster) || 4326;
+      await ensureProjDefinition(rasterEpsg);
+      const analysisGeometry = rasterEpsg === 4326 ? geometry : reprojectGeometry(geometry, 4326, rasterEpsg);
+      const analysisFeature = turf.feature(analysisGeometry);
+
+      const bbox = turf.bbox(analysisFeature);
       const pixelWidth = Math.abs(Number(raster.pixelWidth || raster.resolution?.x || 0));
       const pixelHeight = Math.abs(Number(raster.pixelHeight || raster.resolution?.y || 0));
       if (!(pixelWidth > 0) || !(pixelHeight > 0)) {
         throw new Error("Raster pixel dimensions could not be determined.");
       }
 
-      const left = clamp(bbox[0], raster.xmin, raster.xmax);
-      const right = clamp(bbox[2], raster.xmin, raster.xmax);
-      const bottom = clamp(bbox[1], raster.ymin, raster.ymax);
-      const top = clamp(bbox[3], raster.ymin, raster.ymax);
+      const rxmin = Math.min(raster.xmin, raster.xmax);
+      const rxmax = Math.max(raster.xmin, raster.xmax);
+      const rymin = Math.min(raster.ymin, raster.ymax);
+      const rymax = Math.max(raster.ymin, raster.ymax);
+      const left = clamp(bbox[0], rxmin, rxmax);
+      const right = clamp(bbox[2], rxmin, rxmax);
+      const bottom = clamp(bbox[1], rymin, rymax);
+      const top = clamp(bbox[3], rymin, rymax);
       if (!(right > left) || !(top > bottom)) {
-        throw new Error("Selected area does not overlap the raster extent.");
+        throw new Error(`Selected area does not overlap the raster extent. AOI bbox: ${bbox.map(v => Number(v).toFixed(3)).join(', ')} | Raster extent: ${[rxmin, rymin, rxmax, rymax].map(v => Number(v).toFixed(3)).join(', ')} | Raster EPSG: ${rasterEpsg}`);
       }
 
       const width = Math.max(1, Math.ceil((right - left) / pixelWidth));
@@ -1877,7 +1934,6 @@
         throw new Error("Raster window could not be read for the selected area.");
       }
 
-      const featureForMask = turf.feature(geometry);
       const xStep = (right - left) / width;
       const yStep = (top - bottom) / height;
       const nodata = raster.noDataValue;
@@ -1887,7 +1943,7 @@
         const y = top - ((row + 0.5) * yStep);
         for (let col = 0; col < width; col++) {
           const x = left + ((col + 0.5) * xStep);
-          if (!turf.booleanPointInPolygon(turf.point([x, y]), featureForMask)) continue;
+          if (!turf.booleanPointInPolygon(turf.point([x, y]), analysisFeature)) continue;
           const raw = getGridValue(bandGrid, row, col);
           const value = Number(raw);
           if (!Number.isFinite(value)) continue;
