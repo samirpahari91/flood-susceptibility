@@ -1277,7 +1277,7 @@
     }
 
     const tileToast = document.getElementById("tile-toast");
-    const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8 });
+    const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8, maxNativeZoom: 16, maxZoom: 19 });
     floodLayer.on("loading", () => tileToast.classList.add("on"));
     floodLayer.on("load", () => tileToast.classList.remove("on"));
     floodLayer.addTo(map);
