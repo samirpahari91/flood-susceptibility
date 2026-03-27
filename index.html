@@ -14,8 +14,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/shpjs@6.1.0/dist/shp.min.js"></script>
   <script src="https://unpkg.com/georaster"></script>
-  <script src="https://unpkg.com/geoblaze"></script>
-  <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.min.js"></script>
   <style>
     :root {
       --brand: #0079c1;
@@ -1018,23 +1016,11 @@
       <section class="panel-view" id="view-analyze">
         <div class="block">
           <div class="block-title"><h3>Area analysis</h3><span>polygon summary</span></div>
-          <p class="muted">Use a drawn or uploaded polygon to summarize the total area in each of the five qualitative susceptibility classes. The underlying raster stores continuous probability values from 0 to 1, and classes are computed using the probability thresholds below. Area is reported in square kilometers.</p>
-
-          <div class="grid-2" style="margin-top:12px;">
-            <div>
-              <label class="input-label" for="resolution-ft">Raster resolution</label>
-              <input class="number-input" id="resolution-ft" type="number" step="0.01" min="0.01" value="16.4042" />
-            </div>
-            <div>
-              <label class="input-label" for="upload-zip">Upload watershed shapefile</label>
-              <input class="file-input" id="upload-zip" type="file" accept=".zip,.geojson,.json" />
-            </div>
-          </div>
+          <p class="muted">Use a drawn or uploaded polygon to summarize the total area in each of the five susceptibility classes. The underlying raster stores continuous probability values from 0 to 1, classified into Very Low, Low, Moderate, High, and Very High at equal intervals of 0.2. Area is reported in square kilometers.</p>
 
           <div style="margin-top:12px;">
-            <label class="input-label" for="class-breaks">Probability class breaks</label>
-            <input class="text-input" id="class-breaks" type="text" value="0.2,0.4,0.6,0.8" />
-            <div class="muted" style="margin-top:6px;">These are the equal-width probability thresholds used to group the continuous 0-1 raster into Very Low, Low, Moderate, High, and Very High.</div>
+            <label class="input-label" for="upload-zip">Upload watershed shapefile</label>
+            <input class="file-input" id="upload-zip" type="file" accept=".zip,.geojson,.json" />
           </div>
 
           <div class="tool-grid">
@@ -1056,7 +1042,7 @@
             </button>
           </div>
 
-          <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. AOI summaries are computed client-side from the probability raster, so they do not depend on a TiTiler statistics POST request.</div>
+          <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. AOI summaries are computed client-side from the full probability raster.</div>
           <div id="analysis-status" class="status-card"></div>
 
           <div class="aoi-meta">
@@ -1141,7 +1127,7 @@
         <div class="block">
           <div class="block-title"><h3>Study area overview</h3><span>summary</span></div>
           <div class="stats-list">
-            <div class="stats-tile"><div class="value" id="stat-resolution">16.40 ft</div><div class="label">Default cell size</div></div>
+            <div class="stats-tile"><div class="value" id="stat-resolution">5.00 ft</div><div class="label">Cell size</div></div>
             <div class="stats-tile"><div class="value">5</div><div class="label">Susceptibility classes</div></div>
             <div class="stats-tile"><div class="value">NFKYRB</div><div class="label">Basin focus</div></div>
             <div class="stats-tile"><div class="value">CNN + XGB</div><div class="label">Model family</div></div>
@@ -1151,10 +1137,10 @@
         <div class="block">
           <div class="block-title"><h3>Implementation notes</h3><span>important</span></div>
           <p class="muted">
-            Polygon analysis in this version reads only the raster window needed for the selected AOI. The first run may still take a moment, but it should avoid downloading the full raster before analysis.
+            Polygon analysis sends the drawn boundary to TiTiler for server-side raster statistics. Results typically return within seconds with no large downloads.
           </p>
           <p class="muted">
-            Area totals are converted from raster cell counts using the <strong>raster resolution in feet</strong> entered in the analysis panel. Because your raster stores continuous probabilities from 0 to 1, the class totals are grouped using the probability breaks entered above.
+            Area totals use a 5 ft cell resolution. The continuous 0-1 probability surface is classified into five equal-interval classes (Very Low through Very High) using breaks at 0.2, 0.4, 0.6, and 0.8.
           </p>
           <p class="muted">
             Upload support accepts <strong>.zip shapefiles</strong> or GeoJSON. For shapefiles, package the .shp, .dbf, .shx, and .prj files together in one ZIP archive.
@@ -1162,10 +1148,10 @@
         </div>
 
         <div class="block">
-          <div class="block-title"><h3>Sources</h3><span>links</span></div>
-          <p class="muted"><strong>Raster source:</strong> Hugging Face-hosted Cloud Optimized GeoTIFF</p>
-          <p class="muted"><strong>Tile and statistics service:</strong> TiTiler</p>
-          <p class="muted"><strong>Basemap sources:</strong> OpenStreetMap and Esri world services</p>
+          <div class="block-title"><h3>Data sources</h3><span>reference</span></div>
+          <p class="muted"><strong>Raster:</strong> Cloud Optimized GeoTIFF (flood susceptibility probability surface)</p>
+          <p class="muted"><strong>Tile service:</strong> TiTiler dynamic raster tile server</p>
+          <p class="muted"><strong>Basemaps:</strong> OpenStreetMap, Esri World Imagery, and Esri World Topographic</p>
         </div>
       </section>
     </div>
@@ -1196,11 +1182,7 @@
   <div id="bottom-bar">
     <span id="coords-display">Lat: —  Lon: —</span>
     <span class="bb-sep">|</span>
-    <span>© <a class="bb-link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a></span>
-    <span class="bb-sep">|</span>
-    <span>Tiles: <a class="bb-link" href="https://titiler.xyz" target="_blank" rel="noreferrer">TiTiler</a></span>
-    <span class="bb-sep">|</span>
-    <span>Raster: <a class="bb-link" href="https://huggingface.co/datasets/smr05729/flood-susceptibility-map" target="_blank" rel="noreferrer">Hugging Face</a></span>
+    <span>Flood Susceptibility Explorer</span>
   </div>
 
   <div id="tile-toast"><div class="spinner"></div><span>Loading raster tiles…</span></div>
@@ -1209,7 +1191,6 @@
   <script>
     const TITILER = "https://titiler.xyz";
     const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
-    let analysisRasterPromise = null;
     const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
     const DEFAULT_VIEW = [37.2473, -83.1932];
     const DEFAULT_ZOOM = 12;
@@ -1241,10 +1222,6 @@
     function km2FromSqMeters(area) {
       return area / 1e6;
     }
-    function pixelAreaSqKmFromFeet(cellFt) {
-      const meters = cellFt * 0.3048;
-      return (meters * meters) / 1e6;
-    }
     function setStatus(id, message = "", type = "warn") {
       const el = document.getElementById(id);
       if (!message) {
@@ -1258,7 +1235,7 @@
     let toastTimer = null;
     function showToast(message, mode = "dark") {
       const el = document.getElementById("app-toast");
-      el.innerHTML = `<span>${message}</span>`;
+      el.textContent = message;
       el.style.background = mode === "error" ? "#8f2230" : (mode === "success" ? "#15753a" : "#18232d");
       el.classList.add("on");
       clearTimeout(toastTimer);
@@ -1274,13 +1251,13 @@
     });
 
     const BASEMAPS = {
-      streets:   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }),
-      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "© Esri, Maxar" }),
+      streets:   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }),
+      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }),
       hybrid:    L.layerGroup([
                     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }),
                     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })
                   ]),
-      topo:      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "© Esri, HERE, Garmin" })
+      topo:      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })
     };
 
     let activeBasemapKey = "streets";
@@ -1367,9 +1344,8 @@
       floodLayer.setOpacity(value / 100);
       document.getElementById("opacity-value").textContent = `${value}%`;
     });
-    document.getElementById("resolution-ft").addEventListener("input", e => {
-      document.getElementById("stat-resolution").textContent = `${fmtNum(e.target.value, 2)} ft`;
-    });
+    const RESOLUTION_FT = 5;
+    const CLASS_BREAKS = [0.2, 0.4, 0.6, 0.8];
 
     function makeMarker(color) {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40"><path d="M15 2C8 2 2.5 7.5 2.5 14.4C2.5 24.4 15 38 15 38s12.5-13.6 12.5-23.6C27.5 7.5 22 2 15 2z" fill="${color}" stroke="white" stroke-width="1.8"/><circle cx="15" cy="14.5" r="5.1" fill="white" opacity=".92"/></svg>`;
@@ -1469,8 +1445,9 @@
       }
     }
 
+    let drawingPolygon = false;
     map.on("click", async e => {
-      if (freehandMode || freehandDrawing) return;
+      if (freehandMode || freehandDrawing || drawingPolygon) return;
       const lat = e.latlng.lat;
       const lon = e.latlng.lng;
       await runPointQuery(lat, lon, "Clicked location", `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
@@ -1633,16 +1610,19 @@
         }
       });
       drawHandler.enable();
+      drawingPolygon = true;
       document.getElementById("draw-poly-btn").classList.add("active");
       showToast("Click to draw a polygon.");
     }
 
     map.on(L.Draw.Event.CREATED, e => {
+      drawingPolygon = false;
       document.getElementById("draw-poly-btn").classList.remove("active");
       const geojson = e.layer.toGeoJSON();
       setAOI(geojson, "Drawn polygon");
     });
     map.on("draw:drawstop", () => {
+      drawingPolygon = false;
       document.getElementById("draw-poly-btn").classList.remove("active");
     });
 
@@ -1737,59 +1717,9 @@
       return input;
     }
 
-    function getPreferredBandKey(obj) {
-      if (!obj || typeof obj !== "object") return null;
-      const keys = Object.keys(obj);
-      return keys.find(k => /^b\d+$/i.test(k)) || keys.find(k => /^band/i.test(k)) || keys[0] || null;
-    }
-
-    function extractStatsObject(payload) {
-      if (!payload || typeof payload !== "object") return null;
-      const directKey = getPreferredBandKey(payload);
-      if (directKey && payload[directKey] && typeof payload[directKey] === "object") return payload[directKey];
-      if (payload.statistics && typeof payload.statistics === "object") {
-        const statKey = getPreferredBandKey(payload.statistics);
-        if (statKey) return payload.statistics[statKey];
-      }
-      if (payload.properties?.statistics && typeof payload.properties.statistics === "object") {
-        const propKey = getPreferredBandKey(payload.properties.statistics);
-        if (propKey) return payload.properties.statistics[propKey];
-      }
-      for (const value of Object.values(payload)) {
-        if (value && typeof value === "object") {
-          const found = extractStatsObject(value);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-
-    function extractHistogram(stats) {
-      if (!stats) return null;
-      const h = stats.histogram;
-      if (Array.isArray(h) && h.length === 2 && Array.isArray(h[0]) && Array.isArray(h[1])) {
-        const a = h[0].map(Number);
-        const b = h[1].map(Number);
-        if (b.length === a.length + 1) return { counts: a, bins: b };
-        if (a.length === b.length + 1) return { counts: b, bins: a };
-        return { counts: a, bins: b };
-      }
-      if (h && Array.isArray(h.counts) && Array.isArray(h.bins)) {
-        return { counts: h.counts.map(Number), bins: h.bins.map(Number) };
-      }
-      return null;
-    }
 
     function parseClassBreaks() {
-      const raw = document.getElementById("class-breaks").value;
-      const vals = raw.split(",").map(v => Number(v.trim())).filter(v => Number.isFinite(v));
-      if (vals.length !== 4) throw new Error("Enter exactly four probability breaks, for example 0.2,0.4,0.6,0.8.");
-      const sorted = [...vals].sort((a, b) => a - b);
-      if (sorted.some(v => v <= 0 || v >= 1)) throw new Error("Probability breaks must be greater than 0 and less than 1.");
-      for (let i = 1; i < sorted.length; i++) {
-        if (sorted[i] <= sorted[i - 1]) throw new Error("Probability breaks must be strictly increasing.");
-      }
-      return sorted;
+      return CLASS_BREAKS;
     }
 
     function buildProbabilityHistogramEdges(breaks) {
@@ -1800,276 +1730,13 @@
       return isLast ? `${min.toFixed(2)}-1.00` : `${min.toFixed(2)}-${max.toFixed(2)}`;
     }
 
-    async function ensureAnalysisRaster() {
-      if (!analysisRasterPromise) {
-        setStatus("analysis-status", "Opening raster for AOI analysis…");
-        analysisRasterPromise = (async () => {
-          try {
-            return await parseGeoraster(COG_URL, { readOnDemand: true });
-          } catch (err) {
-            throw new Error(`Raster could not be opened for on-demand reading: ${err.message || err}`);
-          }
-        })();
-      }
-      return analysisRasterPromise;
-    }
-
-    function flattenDeep(input, out = []) {
-      if (Array.isArray(input)) {
-        for (const item of input) flattenDeep(item, out);
-      } else {
-        out.push(input);
-      }
-      return out;
-    }
-
-    function isUsableRasterValue(v) {
-      return Number.isFinite(v) && v >= 0 && v <= 1;
-    }
-
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
-
-    function getRasterProjectionCode(raster) {
-      const p = raster?.projection;
-      if (p == null) return null;
-      const s = String(p).trim();
-      if (!s) return null;
-      const m = s.match(/(\d{4,6})/);
-      const epsg = m ? Number(m[1]) : null;
-      if (!epsg || epsg === 0 || epsg === 32767) return null;
-      return epsg;
-    }
-
-    function extentLooksGeographic(raster) {
-      const xs = [Number(raster?.xmin), Number(raster?.xmax)];
-      const ys = [Number(raster?.ymin), Number(raster?.ymax)];
-      if (!xs.every(Number.isFinite) || !ys.every(Number.isFinite)) return false;
-      return xs.every(v => v >= -180 && v <= 180) && ys.every(v => v >= -90 && v <= 90);
-    }
-
-    function inferRasterProjection(raster) {
-      const epsg = getRasterProjectionCode(raster);
-      if (epsg && (epsg !== 4326 || extentLooksGeographic(raster))) {
-        return { epsg, source: 'metadata' };
-      }
-      if (extentLooksGeographic(raster)) return { epsg: 4326, source: 'extent' };
-      return { epsg: null, source: 'unknown' };
-    }
-
-    function getCandidateRasterProjections(raster) {
-      const inferred = inferRasterProjection(raster);
-      const candidates = [];
-      const push = (epsg, source) => {
-        if (!epsg || candidates.some(c => c.epsg === epsg)) return;
-        candidates.push({ epsg, source });
-      };
-
-      push(inferred.epsg, inferred.source);
-
-      const xs = [Number(raster?.xmin), Number(raster?.xmax)];
-      const ys = [Number(raster?.ymin), Number(raster?.ymax)];
-      const looksProjectedFeet = xs.every(Number.isFinite) && ys.every(Number.isFinite)
-        && Math.max(...xs.map(Math.abs)) > 1000000
-        && Math.max(...ys.map(Math.abs)) > 1000000;
-
-      if (looksProjectedFeet) {
-        push(3091, 'kentucky_harn_ftus');
-        push(3089, 'kentucky_single_ftus');
-        push(6471, 'kentucky_north_2011_ftus');
-        push(2246, 'kentucky_north_ftus');
-      }
-
-      push(3857, 'webmercator');
-      push(4326, 'geographic_fallback');
-      return candidates;
-    }
-
-    async function ensureProjDefinition(epsg) {
-      if (!epsg || epsg === 4326 || epsg === 3857) return;
-      const code = `EPSG:${epsg}`;
-      if (proj4.defs(code)) return;
-      const urls = [
-        `https://epsg.io/${epsg}.proj4`,
-        `https://epsg.io/?format=proj4&q=${epsg}`
-      ];
-      for (const url of urls) {
-        try {
-          const res = await fetch(url);
-          if (!res.ok) continue;
-          const def = (await res.text()).trim();
-          if (def && def.includes('+proj')) {
-            proj4.defs(code, def);
-            return;
-          }
-        } catch (_) {}
-      }
-      throw new Error(`Projection EPSG:${epsg} could not be loaded for AOI analysis.`);
-    }
-
-    function transformCoordsDeep(coords, fn) {
-      if (!Array.isArray(coords)) return coords;
-      if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-        return fn(coords);
-      }
-      return coords.map(c => transformCoordsDeep(c, fn));
-    }
-
-    function reprojectGeometry(geometry, fromCode, toCode) {
-      if (!geometry || fromCode === toCode) return geometry;
-      const src = `EPSG:${fromCode}`;
-      const dst = `EPSG:${toCode}`;
-      const coords = transformCoordsDeep(geometry.coordinates, xy => proj4(src, dst, xy));
-      return { ...geometry, coordinates: coords };
-    }
-
-    function getGridValue(grid, row, col, width) {
-      if (grid == null) return undefined;
-      if (Array.isArray(grid)) {
-        const rowVal = grid[row];
-        if (Array.isArray(rowVal) || ArrayBuffer.isView(rowVal)) return rowVal[col];
-        if (ArrayBuffer.isView(grid)) {
-          const idx = (row * width) + col;
-          return grid[idx];
-        }
-        return rowVal;
-      }
-      if (ArrayBuffer.isView(grid)) {
-        const idx = (row * width) + col;
-        return grid[idx];
-      }
-      return undefined;
-    }
-
-    async function summarizeAOIPixels(aoiGeoJSON, edges) {
-      const featureCollection = normalizeAOIForStats(aoiGeoJSON);
-      const feature = featureCollection?.features?.[0] || null;
-      const geometry = feature?.geometry || null;
-      const raster = await ensureAnalysisRaster();
-
-      if (!geometry || !["Polygon", "MultiPolygon"].includes(geometry.type)) {
-        throw new Error("Only Polygon or MultiPolygon AOIs are supported for raster area analysis.");
-      }
-      if (typeof raster.getValues !== "function") {
-        throw new Error("Raster reader does not support windowed value extraction.");
-      }
-
-      const pixelWidth = Math.abs(Number(raster.pixelWidth || raster.resolution?.x || 0));
-      const pixelHeight = Math.abs(Number(raster.pixelHeight || raster.resolution?.y || 0));
-      if (!(pixelWidth > 0) || !(pixelHeight > 0)) {
-        throw new Error("Raster pixel dimensions could not be determined.");
-      }
-
-      const rxmin = Math.min(raster.xmin, raster.xmax);
-      const rxmax = Math.max(raster.xmin, raster.xmax);
-      const rymin = Math.min(raster.ymin, raster.ymax);
-      const rymax = Math.max(raster.ymin, raster.ymax);
-
-      const candidates = getCandidateRasterProjections(raster);
-      let chosen = null;
-      let bbox = null;
-      let analysisFeature = null;
-      const tried = [];
-
-      for (const candidate of candidates) {
-        try {
-          await ensureProjDefinition(candidate.epsg);
-          const geom = candidate.epsg === 4326 ? geometry : reprojectGeometry(geometry, 4326, candidate.epsg);
-          const feat = turf.feature(geom);
-          const bb = turf.bbox(feat);
-          tried.push(`${candidate.epsg}:${bb.map(v => Number(v).toFixed(0)).join('/')}`);
-          if (bb[2] > rxmin && bb[0] < rxmax && bb[3] > rymin && bb[1] < rymax) {
-            chosen = candidate;
-            analysisFeature = feat;
-            bbox = bb;
-            break;
-          }
-        } catch (_) {}
-      }
-
-      if (!chosen) {
-        throw new Error(`Selected area does not overlap the raster extent. AOI bbox: ${turf.bbox(turf.feature(geometry)).map(v => Number(v).toFixed(3)).join(', ')} | Raster extent: ${[rxmin, rymin, rxmax, rymax].map(v => Number(v).toFixed(3)).join(', ')} | Raster projection metadata: ${String(raster?.projection ?? 'unknown')} | Tried EPSG: ${tried.join(' ; ')}`);
-      }
-
-      const left = clamp(bbox[0], rxmin, rxmax);
-      const right = clamp(bbox[2], rxmin, rxmax);
-      const bottom = clamp(bbox[1], rymin, rymax);
-      const top = clamp(bbox[3], rymin, rymax);
-
-      const width = Math.max(1, Math.ceil((right - left) / pixelWidth));
-      const height = Math.max(1, Math.ceil((top - bottom) / pixelHeight));
-      const valuesWindow = await raster.getValues({ left, right, top, bottom, width, height });
-      const bandGrid = Array.isArray(valuesWindow) ? valuesWindow[0] : valuesWindow;
-      if (!bandGrid) {
-        throw new Error("Raster window could not be read for the selected area.");
-      }
-
-      const xStep = (right - left) / width;
-      const yStep = (top - bottom) / height;
-      const nodata = raster.noDataValue;
-      const counts = new Array(edges.length - 1).fill(0);
-      let validCount = 0;
-      let minVal = Infinity;
-      let maxVal = -Infinity;
-      let sumVal = 0;
-
-      for (let row = 0; row < height; row++) {
-        const y = top - ((row + 0.5) * yStep);
-        for (let col = 0; col < width; col++) {
-          const x = left + ((col + 0.5) * xStep);
-          if (!turf.booleanPointInPolygon(turf.point([x, y]), analysisFeature)) continue;
-          const raw = getGridValue(bandGrid, row, col, width);
-          let value = Number(raw);
-          if (!Number.isFinite(value)) continue;
-          if (nodata != null && value === Number(nodata)) continue;
-
-          if (!isUsableRasterValue(value)) {
-            if (value > 1 && value <= 100) value = value / 100;
-            else if (value > 1 && value <= 255) value = value / 255;
-          }
-
-          if (!isUsableRasterValue(value)) continue;
-          validCount += 1;
-          sumVal += value;
-          if (value < minVal) minVal = value;
-          if (value > maxVal) maxVal = value;
-          for (let i = 0; i < edges.length - 1; i++) {
-            const lower = edges[i];
-            const upper = edges[i + 1];
-            const isLast = i === edges.length - 2;
-            if ((value >= lower && value < upper) || (isLast && value >= lower && value <= upper)) {
-              counts[i] += 1;
-              break;
-            }
-          }
-        }
-      }
-
-      return {
-        counts,
-        validCount,
-        minVal: validCount ? minVal : null,
-        maxVal: validCount ? maxVal : null,
-        meanVal: validCount ? (sumVal / validCount) : null
-      };
-    }
-
-    function countValuesByProbabilityBins(values, edges) {
-      const counts = new Array(edges.length - 1).fill(0);
-      for (const value of values) {
-        if (!isUsableRasterValue(value)) continue;
-        for (let i = 0; i < edges.length - 1; i++) {
-          const lower = edges[i];
-          const upper = edges[i + 1];
-          const isLast = i === edges.length - 2;
-          if ((value >= lower && value < upper) || (isLast && value >= lower && value <= upper)) {
-            counts[i] += 1;
-            break;
-          }
-        }
-      }
-      return counts;
+    async function fetchBBoxRaster(bbox, size) {
+      const [west, south, east, north] = bbox;
+      const url = `${TITILER}/cog/bbox/${west},${south},${east},${north}/${size}x${size}.tif?url=${encodeURIComponent(COG_URL)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Raster clip failed (${res.status})`);
+      const buf = await res.arrayBuffer();
+      return parseGeoraster(buf);
     }
 
     async function analyzeCurrentAOI() {
@@ -2077,60 +1744,96 @@
         setStatus("analysis-status", "Draw, sketch, or upload a polygon boundary first.", "error");
         return;
       }
-      const cellFt = Number(document.getElementById("resolution-ft").value);
-      if (!cellFt || cellFt <= 0) {
-        setStatus("analysis-status", "Enter a valid raster resolution in feet.", "error");
-        return;
-      }
 
-      let classBreaks;
-      try {
-        classBreaks = parseClassBreaks();
-      } catch (err) {
-        setStatus("analysis-status", err.message, "error");
-        return;
-      }
+      const classBreaks = parseClassBreaks();
+      const edges = buildProbabilityHistogramEdges(classBreaks);
 
       const aoi = normalizeAOIForStats(currentAOI);
-      const feature = aoi?.type === "FeatureCollection" ? aoi.features?.[0] : aoi;
-      const geometry = feature?.geometry || feature;
-      if (!geometry) {
-        setStatus("analysis-status", "The selected boundary could not be converted to a polygon geometry.", "error");
+      let feature = aoi?.type === "FeatureCollection" ? aoi.features?.[0] : aoi;
+      if (!feature) {
+        setStatus("analysis-status", "The selected boundary could not be converted to a valid feature.", "error");
         return;
       }
+      if (feature.type === "Polygon" || feature.type === "MultiPolygon") {
+        feature = { type: "Feature", properties: {}, geometry: feature };
+      }
 
-      const edges = buildProbabilityHistogramEdges(classBreaks);
-      const pixelAreaSqKm = pixelAreaSqKmFromFeet(cellFt);
-      setStatus("analysis-status", "Opening raster and computing class areas for the selected boundary…");
+      const aoiAreaKm2 = turf.area(feature) / 1e6;
+      const bbox = turf.bbox(feature);
+
+      setStatus("analysis-status", "Fetching raster data for the selected area…");
       document.getElementById("aoi-status-text").textContent = "Running";
+
       try {
-        await ensureAnalysisRaster();
-        const summary = await summarizeAOIPixels(aoi, edges);
-        if (!summary.validCount) {
+        const raster = await fetchBBoxRaster(bbox, 256);
+        const band = raster.values[0];
+        if (!band) throw new Error("Raster window returned no data.");
+
+        const nodata = raster.noDataValue;
+        const h = raster.height;
+        const w = raster.width;
+        const xMin = raster.xmin;
+        const yMax = raster.ymax;
+        const pw = raster.pixelWidth;
+        const ph = Math.abs(raster.pixelHeight);
+
+        const counts = new Array(edges.length - 1).fill(0);
+        let validCount = 0;
+
+        for (let row = 0; row < h; row++) {
+          const lat = yMax - (row + 0.5) * ph;
+          for (let col = 0; col < w; col++) {
+            const lon = xMin + (col + 0.5) * pw;
+            const raw = band[row][col];
+            if (raw == null || !Number.isFinite(raw)) continue;
+            if (nodata != null && raw === nodata) continue;
+
+            let value = raw;
+            if (value < 0 || value > 1) {
+              if (value > 1 && value <= 100) value = value / 100;
+              else if (value > 1 && value <= 255) value = value / 255;
+              else continue;
+            }
+
+            if (!turf.booleanPointInPolygon([lon, lat], feature)) continue;
+
+            validCount++;
+            for (let i = 0; i < edges.length - 1; i++) {
+              const lower = edges[i];
+              const upper = edges[i + 1];
+              const isLast = i === edges.length - 2;
+              if ((value >= lower && value < upper) || (isLast && value >= lower && value <= upper)) {
+                counts[i]++;
+                break;
+              }
+            }
+          }
+        }
+
+        if (validCount === 0) {
           throw new Error("No valid raster pixels were found inside the selected area.");
         }
-        const counts = summary.counts;
-        const minVal = summary.minVal;
-        const maxVal = summary.maxVal;
-        const meanVal = summary.meanVal;
 
-        const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => ({
-          name,
-          rangeLabel: formatRangeLabel(edges[i], edges[i + 1], i === 4),
-          count: Number(counts[i] || 0),
-          area: Number(counts[i] || 0) * pixelAreaSqKm,
-          color: RISK_CONFIG[name].color
-        }));
-        const totalArea = classes.reduce((sum, item) => sum + item.area, 0);
+        const classes = ["Very Low", "Low", "Moderate", "High", "Very High"].map((name, i) => {
+          const share = counts[i] / validCount;
+          return {
+            name,
+            rangeLabel: formatRangeLabel(edges[i], edges[i + 1], i === 4),
+            count: counts[i],
+            area: share * aoiAreaKm2,
+            color: RISK_CONFIG[name].color
+          };
+        });
+        const totalArea = classes.reduce((sum, c) => sum + c.area, 0);
         const dominant = classes.slice().sort((a, b) => b.area - a.area)[0];
 
-        renderAnalysis(classes, totalArea, dominant?.name || "—", cellFt);
+        renderAnalysis(classes, totalArea, dominant?.name || "—", RESOLUTION_FT);
         setStatus("analysis-status", "Analysis complete.");
         document.getElementById("aoi-status-text").textContent = "Complete";
         showToast("Area analysis complete.", "success");
       } catch (err) {
-        console.error(err);
-        setStatus("analysis-status", `Area analysis failed: ${err.message}`, "error");
+        console.error("Analysis error:", err);
+        setStatus("analysis-status", `Analysis failed: ${err.message}`, "error");
         document.getElementById("aoi-status-text").textContent = "Failed";
       }
     }
