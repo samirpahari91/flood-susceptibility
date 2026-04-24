@@ -1191,14 +1191,10 @@
   <script>
     const TITILER = "https://titiler.xyz";
     const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
-    const CUSTOM_COLORMAP = encodeURIComponent(JSON.stringify([
-      [0,   0.2, [11,  122, 11,  255]],  // Very Low  — dark green
-      [0.2, 0.4, [142, 220, 99,  255]],  // Low       — light green
-      [0.4, 0.6, [255, 212, 0,   255]],  // Moderate  — yellow
-      [0.6, 0.8, [243, 166, 74,  255]],  // High      — orange
-      [0.8, 1.0, [199, 166, 255, 255]]   // Very High — purple
-    ]));
-const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}?url=${encodeURIComponent(COG_URL)}&colormap=${CUSTOM_COLORMAP}&rescale=0,1`;
+    const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}
+      ?url=${encodeURIComponent(COG_URL)}
+      &colormap_name=rdylgn_r   
+      &rescale=0,1`;
     const DEFAULT_VIEW = [37.2473, -83.1932];
     const DEFAULT_ZOOM = 12;
 
