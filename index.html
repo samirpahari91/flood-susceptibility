@@ -1554,6 +1554,27 @@
     let currentAOI = null;
     let currentAOISource = "None";
     let drawHandler = null;
+    
+    async function loadDefaultStudyArea() {
+    try {
+      const geojson = await shp("data/North_Fork_SubBasin.zip");
+  
+      const boundaryLayer = L.geoJSON(geojson, {
+        style: {
+          color: "red",
+          weight: 2.5,
+          fillOpacity: 0,
+          opacity: 1
+        }
+      }).addTo(map);
+  
+      map.fitBounds(boundaryLayer.getBounds(), { padding: [20, 20] });
+    } catch (err) {
+      console.error("Failed to load default study area boundary:", err);
+      showToast("Could not load basin boundary.", "error");
+    }
+  }
+  loadDefaultStudyArea();
 
     function updateAOIMeta() {
       document.getElementById("aoi-source").textContent = currentAOISource;
