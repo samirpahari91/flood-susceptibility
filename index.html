@@ -1427,11 +1427,23 @@
     let geoPool = null;
     try { geoPool = new GeoTIFF.Pool(); } catch (_) { geoPool = null; }
 
+    // After an analysis run the flood layer is shown only inside the analyzed AOI; clearing the AOI restores the full map
+    let clipGeo = null, clipBBox = null;
+    function setFloodClip(geojson) {
+      clipGeo = geojson || null;
+      clipBBox = clipGeo ? turf.bbox(clipGeo) : null;
+      floodLayer.redraw();
+    }
+
     async function renderFloodTile(canvas, coords, size) {
       const cog = await openCOG();
       const n = TILE_GRID + 1;
       const gx = new Float64Array(n * n), gy = new Float64Array(n * n);
       const origin = coords.scaleBy(size);
+      if (clipBBox) {
+        const nw = map.unproject(origin, coords.z), se = map.unproject(origin.add(size), coords.z);
+        if (se.lng < clipBBox[0] || nw.lng > clipBBox[2] || nw.lat < clipBBox[1] || se.lat > clipBBox[3]) return;
+      }
       for (let j = 0; j < n; j++) {
         for (let i = 0; i < n; i++) {
           const ll = map.unproject([origin.x + i * size.x / TILE_GRID, origin.y + j * size.y / TILE_GRID], coords.z);
@@ -1486,6 +1498,22 @@
         }
       }
       ctx.putImageData(img, 0, 0);
+      if (clipGeo) {
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.beginPath();
+        turf.flattenEach(clipGeo, f => {
+          if (!f.geometry || f.geometry.type !== "Polygon") return;
+          f.geometry.coordinates.forEach(ring => {
+            ring.forEach((c, idx) => {
+              const p = map.project([c[1], c[0]], coords.z).subtract(origin);
+              if (idx === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            ctx.closePath();
+          });
+        });
+        ctx.fill("evenodd");
+        ctx.globalCompositeOperation = "source-over";
+      }
     }
 
     const FloodCOGLayer = L.GridLayer.extend({
@@ -1807,6 +1835,7 @@
     function setAOI(geojson, sourceLabel) {
       currentAOI = geojson;
       currentAOISource = sourceLabel;
+      if (clipGeo) setFloodClip(null);
       aoiLayer.clearLayers();
       const layer = L.geoJSON(geojson, {
         style: {
@@ -1829,6 +1858,7 @@
       stopFreehandMode();
       aoiLayer.clearLayers();
       currentAOI = null;
+      if (clipGeo) setFloodClip(null);
       currentAOISource = "None";
       updateAOIMeta();
       setStatus("analysis-status", "");
@@ -2009,7 +2039,8 @@
         renderAnalysis(classes, totalArea, dominant?.name || "—", result.cellFt);
         setStatus("analysis-status", "Analysis complete.");
         document.getElementById("aoi-status-text").textContent = "Complete";
-        showToast("Area analysis complete.", "success");
+        setFloodClip(aoi);
+        showToast("Analysis complete. Map now shows only the analyzed area. Use Clear AOI to see the full map.", "success");
       } catch (err) {
         console.error("Analysis error:", err);
         const msg = err instanceof TypeError ? "Could not reach the raster file. Check your connection and try again." : err.message;
