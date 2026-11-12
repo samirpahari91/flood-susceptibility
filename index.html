@@ -1156,7 +1156,7 @@
         <div class="block">
           <div class="block-title"><h3>Data sources</h3><span>reference</span></div>
           <p class="muted"><strong>Raster:</strong> Cloud Optimized GeoTIFF (flood susceptibility probability surface)</p>
-          <p class="muted"><strong>Tile service:</strong> TiTiler dynamic raster tile server</p>
+          <p class="muted"><strong>Rendering:</strong> drawn in the browser directly from the Cloud Optimized GeoTIFF (no tile server)</p>
           <p class="muted"><strong>Basemaps:</strong> OpenStreetMap, Esri World Imagery, and Esri World Topographic</p>
         </div>
       </section>
@@ -1385,17 +1385,18 @@
       zoom: DEFAULT_ZOOM,
       zoomControl: false,
       attributionControl: false,
-      preferCanvas: true
+      preferCanvas: true,
+      maxZoom: 21
     });
 
     const BASEMAPS = {
-      streets:   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }),
-      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }),
+      streets:   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 21, maxNativeZoom: 19 }),
+      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19 }),
       hybrid:    L.layerGroup([
-                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }),
-                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })
+                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19 }),
+                    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19 })
                   ]),
-      topo:      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 })
+      topo:      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19 })
     };
 
     let activeBasemapKey = "streets";
@@ -1414,19 +1415,95 @@
       if (btn) btn.classList.add("active");
     }
 
+    // ---- Flood raster tiles rendered in the browser straight from the COG (no tile server, no rate limits) ----
+    const CLASS_RGB = [
+      [11, 122, 11],    // Very Low  #0B7A0B
+      [142, 220, 99],   // Low       #8EDC63
+      [255, 212, 0],    // Moderate  #FFD400
+      [243, 166, 74],   // High      #F3A64A
+      [199, 166, 255]   // Very High #C7A6FF
+    ];
+    const TILE_GRID = 16; // projection is sampled on a 17x17 grid per tile and interpolated
+    let geoPool = null;
+    try { geoPool = new GeoTIFF.Pool(); } catch (_) { geoPool = null; }
+
+    async function renderFloodTile(canvas, coords, size) {
+      const cog = await openCOG();
+      const n = TILE_GRID + 1;
+      const gx = new Float64Array(n * n), gy = new Float64Array(n * n);
+      const origin = coords.scaleBy(size);
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const ll = map.unproject([origin.x + i * size.x / TILE_GRID, origin.y + j * size.y / TILE_GRID], coords.z);
+          const p = toRasterCRS.forward([ll.lng, ll.lat]);
+          gx[j * n + i] = p[0];
+          gy[j * n + i] = p[1];
+        }
+      }
+      // Ground size of one screen pixel (raster feet) -> coarsest overview that is still at least as fine
+      const screenPx = Math.hypot(gx[1] - gx[0], gy[1] - gy[0]) / (size.x / TILE_GRID);
+      let level = cog.levels[0];
+      for (const l of cog.levels) {
+        if ((cog.maxX - cog.minX) / l.getWidth() <= screenPx) level = l;
+      }
+      const lw = level.getWidth(), lh = level.getHeight();
+      const resX = (cog.maxX - cog.minX) / lw, resY = (cog.maxY - cog.minY) / lh;
+
+      let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+      for (let k = 0; k < n * n; k++) {
+        const c = (gx[k] - cog.minX) / resX, r = (cog.maxY - gy[k]) / resY;
+        if (c < c0) c0 = c; if (c > c1) c1 = c;
+        if (r < r0) r0 = r; if (r > r1) r1 = r;
+      }
+      c0 = Math.max(0, Math.floor(c0) - 1); c1 = Math.min(lw, Math.ceil(c1) + 1);
+      r0 = Math.max(0, Math.floor(r0) - 1); r1 = Math.min(lh, Math.ceil(r1) + 1);
+      if (c1 <= c0 || r1 <= r0) return; // tile is outside the raster: leave it transparent
+
+      const data = await level.readRasters({ window: [c0, r0, c1, r1], samples: [0], interleave: true, pool: geoPool || undefined });
+      const W = c1 - c0, H = r1 - r0;
+      const minClass = highOnly ? 3 : 0;
+
+      const ctx = canvas.getContext("2d");
+      const img = ctx.createImageData(size.x, size.y);
+      const px = img.data;
+      const cell = size.x / TILE_GRID;
+      for (let y = 0; y < size.y; y++) {
+        const fy = (y + 0.5) / cell, j = Math.min(TILE_GRID - 1, Math.floor(fy)), ty = fy - j;
+        for (let x = 0; x < size.x; x++) {
+          const fx = (x + 0.5) / cell, i = Math.min(TILE_GRID - 1, Math.floor(fx)), tx = fx - i;
+          const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+          const X = (gx[a] * (1 - tx) + gx[b] * tx) * (1 - ty) + (gx[c] * (1 - tx) + gx[d] * tx) * ty;
+          const Y = (gy[a] * (1 - tx) + gy[b] * tx) * (1 - ty) + (gy[c] * (1 - tx) + gy[d] * tx) * ty;
+          const col = Math.floor((X - cog.minX) / resX) - c0;
+          const row = Math.floor((cog.maxY - Y) / resY) - r0;
+          if (col < 0 || row < 0 || col >= W || row >= H) continue;
+          const v = data[row * W + col];
+          if (!(v >= 0 && v <= 1)) continue; // nodata
+          const k = v < 0.2 ? 0 : v < 0.4 ? 1 : v < 0.6 ? 2 : v < 0.8 ? 3 : 4;
+          if (k < minClass) continue;
+          const o = (y * size.x + x) * 4, rgb = CLASS_RGB[k];
+          px[o] = rgb[0]; px[o + 1] = rgb[1]; px[o + 2] = rgb[2]; px[o + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+
+    const FloodCOGLayer = L.GridLayer.extend({
+      createTile(coords, done) {
+        const size = this.getTileSize();
+        const canvas = document.createElement("canvas");
+        canvas.width = size.x;
+        canvas.height = size.y;
+        renderFloodTile(canvas, coords, size).then(() => done(null, canvas), err => done(err, canvas));
+        return canvas;
+      }
+    });
+
     const tileToast = document.getElementById("tile-toast");
-    const floodLayer = L.tileLayer(TILE_URL, { opacity: 0.8, maxNativeZoom: 16, maxZoom: 19 });
+    const floodLayer = new FloodCOGLayer({ opacity: 0.8, maxZoom: 21, updateWhenZooming: false, keepBuffer: 4 });
     floodLayer.on("loading", () => tileToast.classList.add("on"));
     floodLayer.on("load", () => tileToast.classList.remove("on"));
-    floodLayer.on("tileerror", e => {
-      // titiler.xyz is a public demo server and sometimes rate-limits (HTTP 429): retry with a growing delay
-      const tile = e.tile;
-      const tries = Number(tile.dataset.retries || 0);
-      if (tries >= 3) return;
-      tile.dataset.retries = String(tries + 1);
-      const url = floodLayer.getTileUrl(e.coords);
-      setTimeout(() => { tile.src = `${url}&retry=${tries + 1}`; }, 3000 * (tries + 1));
-    });
+    floodLayer.on("tileerror", e => console.warn("Flood tile failed", e.coords, e.error));
     floodLayer.addTo(map);
 
     let cogBounds = null;
@@ -1487,7 +1564,7 @@
     let highOnly = false;
     function toggleHighOnly() {
       highOnly = !highOnly;
-      floodLayer.setUrl(highOnly ? TILE_URL_HIGH_ONLY : TILE_URL);
+      floodLayer.redraw();
       document.querySelectorAll(".hv-toggle-btn").forEach(b => b.classList.toggle("active", highOnly));
       if (highOnly && !floodVisible) toggleFloodLayer();
       showToast(highOnly ? "Showing High and Very High susceptibility only." : "Showing all susceptibility classes.");
