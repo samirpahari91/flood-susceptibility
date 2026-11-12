@@ -1041,6 +1041,10 @@
               Clear AOI
               <small>Remove drawn or uploaded geometry</small>
             </button>
+            <button class="tool-action hv-toggle-btn" type="button" style="grid-column: 1 / -1;" onclick="toggleHighOnly()">
+              High &amp; Very High only
+              <small>Show only High and Very High susceptibility on the map</small>
+            </button>
           </div>
 
           <div class="hint-card">Upload a <strong>zipped shapefile</strong> containing the watershed polygon files together, or draw directly on the map. AOI summaries are computed client-side from the full probability raster.</div>
@@ -1096,6 +1100,7 @@
           <div class="block-title"><h3>Map layers</h3><span>display</span></div>
           <div class="tool-grid" style="grid-template-columns:1fr;">
             <button class="tool-action" id="flood-toggle-btn" type="button" onclick="toggleFloodLayer()">Flood susceptibility raster<small>Toggle visibility</small></button>
+            <button class="tool-action hv-toggle-btn" type="button" onclick="toggleHighOnly()">High &amp; Very High only<small>Hide Very Low, Low and Moderate</small></button>
           </div>
           <label class="input-label" for="opacity-slider">Raster opacity</label>
           <input id="opacity-slider" type="range" min="0" max="100" value="80" style="width:100%; accent-color: var(--brand);" />
@@ -1201,6 +1206,12 @@
     ]));
 
     const TILE_URL =`${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&bidx=1&rescale=0,1&colormap=${colormap}`;
+    // Same colors for High / Very High; values below 0.6 have no entry, so they render transparent
+    const colormapHighOnly = encodeURIComponent(JSON.stringify([
+      [[153, 204], [243, 166, 74, 255]],  // High      #F3A64A
+      [[204, 256], [199, 166, 255, 255]]  // Very High #C7A6FF
+    ]));
+    const TILE_URL_HIGH_ONLY = TILE_URL.replace(`colormap=${colormap}`, `colormap=${colormapHighOnly}`);
     // const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
     // ---- Direct COG access: reads the GeoTIFF straight from Hugging Face (no TiTiler needed) ----
     // Raster CRS: EPSG:3089, NAD83 / Kentucky Single Zone (US survey feet)
@@ -1472,6 +1483,14 @@
         map.removeLayer(floodLayer);
       }
       document.getElementById("flood-toggle-btn").classList.toggle("active", floodVisible);
+    }
+    let highOnly = false;
+    function toggleHighOnly() {
+      highOnly = !highOnly;
+      floodLayer.setUrl(highOnly ? TILE_URL_HIGH_ONLY : TILE_URL);
+      document.querySelectorAll(".hv-toggle-btn").forEach(b => b.classList.toggle("active", highOnly));
+      if (highOnly && !floodVisible) toggleFloodLayer();
+      showToast(highOnly ? "Showing High and Very High susceptibility only." : "Showing all susceptibility classes.");
     }
     document.getElementById("opacity-slider").addEventListener("input", e => {
       const value = Number(e.target.value);
