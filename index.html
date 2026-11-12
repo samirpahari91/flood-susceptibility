@@ -1191,13 +1191,13 @@
   <script>
     const TITILER = "https://titiler.xyz";
     const COG_URL = "https://huggingface.co/datasets/smr05729/flood-susceptibility-map/resolve/main/flood_cog.tif";
-    const colormap = encodeURIComponent(JSON.stringify({
-      "0": "#0B7A0B",
-      "64": "#8EDC63",
-      "128": "#FFD400",
-      "192": "#F3A64A",
-      "255": "#C7A6FF"
-    }));
+    const colormap = encodeURIComponent(JSON.stringify([
+      [[0, 51],    [11, 122, 11, 255]],   // Very Low  #0B7A0B
+      [[51, 102],  [142, 220, 99, 255]],  // Low       #8EDC63
+      [[102, 153], [255, 212, 0, 255]],   // Moderate  #FFD400
+      [[153, 204], [243, 166, 74, 255]],  // High      #F3A64A
+      [[204, 256], [199, 166, 255, 255]]  // Very High #C7A6FF
+    ]));
 
     const TILE_URL =`${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(COG_URL)}&bidx=1&rescale=0,1&colormap=${colormap}`;
     // const TILE_URL = `${TITILER}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}?url=${encodeURIComponent(COG_URL)}&colormap_name=rdylgn_r&rescale=0,1`;
